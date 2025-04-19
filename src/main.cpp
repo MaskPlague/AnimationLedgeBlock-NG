@@ -20,7 +20,7 @@ void SetupLog()
     spdlog::flush_on(spdlog::level::trace);
 }
 
-// Code basis comes from SkyParkourV2
+// Method base comes from SkyParkourV2
 bool IsLedgeAhead()
 {
     const auto player = RE::PlayerCharacter::GetSingleton();
@@ -215,12 +215,12 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse)
     SetupLog();
     spdlog::set_level(spdlog::level::debug);
 
-    logger::info("Attack Animation Fling Fix NG Plugin Starting");
+    logger::info("Animation Ledge Block NG Plugin Starting");
 
     auto *messaging = SKSE::GetMessagingInterface();
     messaging->RegisterListener("SKSE", MessageHandler);
 
-    logger::info("Attack Animation Fling Fix NG Plugin Loaded");
+    logger::info("Animation Ledge Block NG Plugin Loaded");
 
     return true;
 }

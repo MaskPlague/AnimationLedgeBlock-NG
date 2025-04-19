@@ -20,7 +20,7 @@ void SetupLog()
     spdlog::flush_on(spdlog::level::trace);
 }
 
-// Code mostly comes from SkyParkourV2
+// Code basis comes from SkyParkourV2
 bool IsLedgeAhead()
 {
     const auto player = RE::PlayerCharacter::GetSingleton();
@@ -47,6 +47,7 @@ bool IsLedgeAhead()
     float yaw = player->data.angle.z;
     RE::NiPoint3 forwardVec(std::sin(yaw), std::cos(yaw), 0.0f);
     logger::trace("forward vector x{} y{} z{}", forwardVec.x, forwardVec.y, forwardVec.z);
+
     // Setup ray origin slightly in front of player
     RE::NiPoint3 rayUnscaledFrom = playerPos + (forwardVec * ledgeDistance) + RE::NiPoint3(0, 0, 100.0f);
     RE::NiPoint3 rayUnscaledTo = rayUnscaledFrom + RE::NiPoint3(0, 0, -rayLength);

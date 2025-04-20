@@ -21,7 +21,7 @@ void SetupLog()
     spdlog::set_level(spdlog::level::trace);
     spdlog::flush_on(spdlog::level::trace);
 }
-constexpr int kRayMarkerCount = 9;
+constexpr int kRayMarkerCount = 12;
 static std::vector<RE::TESObjectREFR *> rayMarkers;
 
 // Call this once to spawn them near the player
@@ -60,12 +60,13 @@ void InitializeRayMarkers()
         }
     }
 }
-// Method base comes from SkyParkourV2
+
 bool IsLedgeAhead()
 {
     const auto player = RE::PlayerCharacter::GetSingleton();
-    if (!player)
+    if (!player || player->AsActorState()->IsSwimming() || player->AsActorState()->IsFlying())
         return false;
+
     const auto cell = player->GetParentCell();
     if (!cell)
         return false;
@@ -75,81 +76,82 @@ bool IsLedgeAhead()
         return false;
 
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
-    const float rayLength = 600.0f;
+    const float rayLength = 600.0f; // probably could be shorter
     const float ledgeDistance = 50.0f;
-    const float dropThreshold = 200.0f;
-    const float maxStepUpHeight = 50.0f;
+    const float dropThreshold = 200.0f;    // 2x 1.0 player height
+    const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
+    const float directionThreshold = 0.7f; // Adjust for tighter/looser direction matching
 
     RE::NiPoint3 playerPos = player->GetPosition();
     RE::NiPoint3 currentLinearVelocity;
     player->GetLinearVelocity(currentLinearVelocity);
+    // z is not important
     currentLinearVelocity.z = 0.0f;
     float velocityLength = currentLinearVelocity.Length();
+
+    // where to force the player to move, this fights AMR so players aren't forced off the ledge.
+    RE::NiPoint3 moveDirection = {0.0f, 0.0f, 0.0f};
     if (velocityLength > 0.0f)
     {
-        RE::NiPoint3 moveDirection = currentLinearVelocity / velocityLength;
+        moveDirection = currentLinearVelocity / velocityLength;
         globalPlayerPos = playerPos - (moveDirection * 5.0f);
     }
     else
+    {
         globalPlayerPos = playerPos;
-    // Calculate forward vector from player's yaw
-    // float baseYaw = player->data.angle.z;
-    std::vector<float> yawOffsets;
-    const int numRays = 9; // 360° / 9
-    const float angleStep = static_cast<float>(2.0 * std::_Pi_val / static_cast<long double>(numRays));
+    }
 
+    // Yaw offsets to use for rays around the player
+    std::vector<float> yawOffsets;
+    const int numRays = 12; // Number of rays to create.
+    const float angleStep = static_cast<float>(2.0 * std::_Pi_val / static_cast<long double>(numRays));
     for (int i = 0; i < numRays; ++i)
     {
         yawOffsets.push_back(i * angleStep);
     }
-    int i = 0;
+
+    int i = 0; // increment into ray markers
     for (float yaw : yawOffsets)
     {
         RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
+        float dirLength = dirVec.Length();
+        if (dirLength == 0.0f)
+            continue;
 
-        RE::NiPoint3 rayFrom = playerPos + (dirVec * ledgeDistance) + RE::NiPoint3(0, 0, 250);
+        RE::NiPoint3 normalizedDir = dirVec / dirLength;
+
+        // Skip if we're moving and this direction doesn't match our movement
+        if (velocityLength > 0.0f)
+        {
+            float alignment = normalizedDir.Dot(moveDirection);
+            if (alignment < directionThreshold)
+                continue;
+        }
+
+        RE::NiPoint3 rayFrom = playerPos + (normalizedDir * ledgeDistance) + RE::NiPoint3(0, 0, 250);
         RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
 
         RE::bhkPickData ray;
         ray.rayInput.from = rayFrom * havokWorldScale;
         ray.rayInput.to = rayTo * havokWorldScale;
 
-        // Set up collision filter to exclude the player
+        // Don't collide with player, from SkyParkourV2
         uint32_t collisionFilterInfo = 0;
         player->GetCollisionFilterInfo(collisionFilterInfo);
         ray.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
 
-        // Perform raycast
         if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
         {
-            // float fraction = std::clamp(ray.rayOutput.hitFraction, 0.0f, 1.0f);
             RE::NiPoint3 delta = rayTo - rayFrom;
             RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
-            if (debugMode)
+
+            if (debugMode) // if in debug mode move objects to ray hit positions
             {
                 auto marker = rayMarkers[i];
                 marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
-                i = i + 1;
+                i++;
             }
-            /*const uint32_t layerIndex = ray.rayOutput.rootCollidable->broadPhaseHandle.collisionFilterInfo & 0x7F;
-            RE::COL_LAYER layerHit = static_cast<RE::COL_LAYER>(layerIndex);
-            switch (layerHit)
-            {
-            case RE::COL_LAYER::kStatic:
-            case RE::COL_LAYER::kCollisionBox:
-            case RE::COL_LAYER::kTerrain:
-            case RE::COL_LAYER::kGround:
-            case RE::COL_LAYER::kProps:
-            case RE::COL_LAYER::kDoorDetection:
-            case RE::COL_LAYER::kTrees:
-            case RE::COL_LAYER::kClutterLarge:
-            case RE::COL_LAYER::kAnimStatic:
-            case RE::COL_LAYER::kDebrisLarge:
-                break; // Valid ground layers
-            default:
-                logger::trace("Ignored non-ground layer.");
-                return 0.0f;
-            }*/
+
             logger::trace("player z {}", playerPos.z);
             bool debugTest = true;
             if (hitPos.z > playerPos.z - maxStepUpHeight)
@@ -176,8 +178,11 @@ bool IsLedgeAhead()
             return true;
         }
     }
+
     return false;
 }
+
+// Force the player to stop moving toward their original vector
 void StopPlayerVelocity()
 {
     auto *player = RE::PlayerCharacter::GetSingleton();

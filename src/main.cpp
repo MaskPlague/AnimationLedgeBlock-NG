@@ -66,7 +66,6 @@ bool IsLedgeAhead()
     const auto player = RE::PlayerCharacter::GetSingleton();
     if (!player)
         return false;
-
     const auto cell = player->GetParentCell();
     if (!cell)
         return false;
@@ -76,93 +75,109 @@ bool IsLedgeAhead()
         return false;
 
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
-    const float rayLength = 520.0f;
+    const float rayLength = 600.0f;
     const float ledgeDistance = 50.0f;
     const float dropThreshold = 200.0f;
     const float maxStepUpHeight = 50.0f;
 
     RE::NiPoint3 playerPos = player->GetPosition();
-
-    // Calculate forward vector from player's yaw
-    float yaw = player->data.angle.z;
-    RE::NiPoint3 forwardVec(std::sin(yaw), std::cos(yaw), 0.0f);
-    logger::trace("forward vector x{} y{} z{}", forwardVec.x, forwardVec.y, forwardVec.z);
-
-    // Setup ray origin slightly in front of player
-    RE::NiPoint3 rayUnscaledFrom = playerPos + (forwardVec * ledgeDistance) + RE::NiPoint3(0, 0, 100.0f);
-    RE::NiPoint3 rayUnscaledTo = rayUnscaledFrom + RE::NiPoint3(0, 0, -rayLength);
-
-    // How fast to move from the ledge
-    globalPlayerPos = playerPos - (forwardVec * 5);
-    int i = 0;
-
-    RE::bhkPickData ray;
-    ray.rayInput.from = rayUnscaledFrom * havokWorldScale;
-    ray.rayInput.to = rayUnscaledTo * havokWorldScale;
-
-    // Set up collision filter to exclude the player
-    uint32_t collisionFilterInfo = 0;
-    player->GetCollisionFilterInfo(collisionFilterInfo);
-    ray.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
-
-    // Perform raycast
-    if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
+    RE::NiPoint3 currentLinearVelocity;
+    player->GetLinearVelocity(currentLinearVelocity);
+    currentLinearVelocity.z = 0.0f;
+    float velocityLength = currentLinearVelocity.Length();
+    if (velocityLength > 0.0f)
     {
-        float fraction = std::clamp(ray.rayOutput.hitFraction, 0.0f, 1.0f);
-        RE::NiPoint3 delta = rayUnscaledTo - rayUnscaledFrom;
-        RE::NiPoint3 hitPos = rayUnscaledFrom + delta * fraction;
+        RE::NiPoint3 moveDirection = currentLinearVelocity / velocityLength;
+        globalPlayerPos = playerPos - (moveDirection * 5.0f);
+    }
+    else
+        globalPlayerPos = playerPos;
+    // Calculate forward vector from player's yaw
+    // float baseYaw = player->data.angle.z;
+    std::vector<float> yawOffsets;
+    const int numRays = 9; // 360° / 9
+    const float angleStep = static_cast<float>(2.0 * std::_Pi_val / static_cast<long double>(numRays));
 
-        /*const uint32_t layerIndex = ray.rayOutput.rootCollidable->broadPhaseHandle.collisionFilterInfo & 0x7F;
-        RE::COL_LAYER layerHit = static_cast<RE::COL_LAYER>(layerIndex);
-        switch (layerHit)
+    for (int i = 0; i < numRays; ++i)
+    {
+        yawOffsets.push_back(i * angleStep);
+    }
+    int i = 0;
+    for (float yaw : yawOffsets)
+    {
+        RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
+
+        RE::NiPoint3 rayFrom = playerPos + (dirVec * ledgeDistance) + RE::NiPoint3(0, 0, 250);
+        RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
+
+        RE::bhkPickData ray;
+        ray.rayInput.from = rayFrom * havokWorldScale;
+        ray.rayInput.to = rayTo * havokWorldScale;
+
+        // Set up collision filter to exclude the player
+        uint32_t collisionFilterInfo = 0;
+        player->GetCollisionFilterInfo(collisionFilterInfo);
+        ray.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
+
+        // Perform raycast
+        if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
         {
-        case RE::COL_LAYER::kStatic:
-        case RE::COL_LAYER::kCollisionBox:
-        case RE::COL_LAYER::kTerrain:
-        case RE::COL_LAYER::kGround:
-        case RE::COL_LAYER::kProps:
-        case RE::COL_LAYER::kDoorDetection:
-        case RE::COL_LAYER::kTrees:
-        case RE::COL_LAYER::kClutterLarge:
-        case RE::COL_LAYER::kAnimStatic:
-        case RE::COL_LAYER::kDebrisLarge:
-            break; // Valid ground layers
-        default:
-            logger::trace("Ignored non-ground layer.");
-            return 0.0f;
-        }*/
-        logger::trace("player z {}", playerPos.z);
-        if (hitPos.z > playerPos.z - maxStepUpHeight)
-        {
-            logger::debug("Hit surface is above playerPos.z — likely a wall.");
-            return false;
-        }
+            // float fraction = std::clamp(ray.rayOutput.hitFraction, 0.0f, 1.0f);
+            RE::NiPoint3 delta = rayTo - rayFrom;
+            RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
             if (debugMode)
             {
                 auto marker = rayMarkers[i];
                 marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
                 i = i + 1;
             }
+            /*const uint32_t layerIndex = ray.rayOutput.rootCollidable->broadPhaseHandle.collisionFilterInfo & 0x7F;
+            RE::COL_LAYER layerHit = static_cast<RE::COL_LAYER>(layerIndex);
+            switch (layerHit)
+            {
+            case RE::COL_LAYER::kStatic:
+            case RE::COL_LAYER::kCollisionBox:
+            case RE::COL_LAYER::kTerrain:
+            case RE::COL_LAYER::kGround:
+            case RE::COL_LAYER::kProps:
+            case RE::COL_LAYER::kDoorDetection:
+            case RE::COL_LAYER::kTrees:
+            case RE::COL_LAYER::kClutterLarge:
+            case RE::COL_LAYER::kAnimStatic:
+            case RE::COL_LAYER::kDebrisLarge:
+                break; // Valid ground layers
+            default:
+                logger::trace("Ignored non-ground layer.");
+                return 0.0f;
+            }*/
+            logger::trace("player z {}", playerPos.z);
             bool debugTest = true;
+            if (hitPos.z > playerPos.z - maxStepUpHeight)
+            {
+                logger::trace("Hit surface is above playerPos.z — likely a wall.");
+                if (debugMode)
+                    debugTest = false;
+                else
+                    return false;
+            }
 
-        float verticalDrop = playerPos.z - hitPos.z;
-        logger::trace("Ledge drop at {:.2f} units ahead: {:.2f} units down", ledgeDistance, verticalDrop);
+            float verticalDrop = playerPos.z - hitPos.z;
+            logger::trace("Ledge drop at {:.2f} units ahead: {:.2f} units down", ledgeDistance, verticalDrop);
 
-        if (verticalDrop > dropThreshold)
+            if (verticalDrop > dropThreshold && debugTest)
+            {
+                logger::trace("Ledge detected!");
+                return true;
+            }
+        }
+        else
         {
-            logger::debug("Ledge detected!");
+            logger::trace("No surface hit ahead — definite ledge.");
             return true;
         }
     }
-    else
-    {
-        logger::debug("No surface hit ahead — definite ledge.");
-        return true;
-    }
-
     return false;
 }
-
 void StopPlayerVelocity()
 {
     auto *player = RE::PlayerCharacter::GetSingleton();
@@ -185,8 +200,8 @@ public:
         {
             return RE::BSEventNotifyControl::kStop;
         }
-        // logger::trace("Payload: {}", event->payload);
-        // logger::trace("Tag: {}\n", event->tag);
+        logger::debug("Payload: {}", event->payload);
+        logger::debug("Tag: {}\n", event->tag);
         if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" || event->tag == "RollTrigger"))
         {
             isAttacking = true;
@@ -207,7 +222,7 @@ void EdgeCheck()
     if (IsLedgeAhead() && isAttacking)
     {
         StopPlayerVelocity();
-        logger::debug("Cliff detected");
+        logger::trace("Cliff detected");
     }
     else
     {

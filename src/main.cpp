@@ -192,7 +192,7 @@ public:
             isAttacking = true;
             logger::debug("Animation Started");
         }
-        else if (isAttacking && (event->tag == "attackStop" || event->tag == "MCO_DodgeOpen" || event->tag == "RollStop"))
+        else if (isAttacking && (event->tag == "attackStop" || event->payload == "$DMCO_Reset" || event->tag == "RollStop"))
         {
             isAttacking = false;
             logger::debug("Animation Finished");

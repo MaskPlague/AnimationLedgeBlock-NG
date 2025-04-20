@@ -2,6 +2,8 @@
 
 namespace logger = SKSE::log;
 
+bool debugMode = false;
+
 bool isAttacking = false;
 bool eventSinkStarted = false;
 RE::NiPoint3 globalPlayerPos = RE::NiPoint3();
@@ -19,7 +21,45 @@ void SetupLog()
     spdlog::set_level(spdlog::level::trace);
     spdlog::flush_on(spdlog::level::trace);
 }
+constexpr int kRayMarkerCount = 9;
+static std::vector<RE::TESObjectREFR *> rayMarkers;
 
+// Call this once to spawn them near the player
+void InitializeRayMarkers()
+{
+    auto *player = RE::PlayerCharacter::GetSingleton();
+
+    if (!rayMarkers.empty())
+    {
+        return; // Already initialized
+    }
+
+    auto markerBase = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0004e4e6);
+    if (!markerBase || !player)
+    {
+        return;
+    }
+
+    auto cell = player->GetParentCell();
+    if (!cell)
+    {
+        return;
+    }
+
+    // Spawn markers near player and store references
+    RE::NiPoint3 origin = player->GetPosition();
+
+    for (int i = 0; i < kRayMarkerCount; ++i)
+    {
+        player->PlaceObjectAtMe(markerBase, true);
+        auto placed = player->PlaceObjectAtMe(markerBase, true);
+        if (placed)
+        {
+            placed->SetPosition(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ() + 200);
+            rayMarkers.push_back(placed.get());
+        }
+    }
+}
 // Method base comes from SkyParkourV2
 bool IsLedgeAhead()
 {
@@ -54,6 +94,7 @@ bool IsLedgeAhead()
 
     // How fast to move from the ledge
     globalPlayerPos = playerPos - (forwardVec * 5);
+    int i = 0;
 
     RE::bhkPickData ray;
     ray.rayInput.from = rayUnscaledFrom * havokWorldScale;
@@ -96,6 +137,13 @@ bool IsLedgeAhead()
             logger::debug("Hit surface is above playerPos.z — likely a wall.");
             return false;
         }
+            if (debugMode)
+            {
+                auto marker = rayMarkers[i];
+                marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
+                i = i + 1;
+            }
+            bool debugTest = true;
 
         float verticalDrop = playerPos.z - hitPos.z;
         logger::trace("Ledge drop at {:.2f} units ahead: {:.2f} units down", ledgeDistance, verticalDrop);
@@ -186,6 +234,8 @@ void OnPostLoadGame()
         logger::info("Creating Event Sink");
         try
         {
+            if (debugMode)
+                InitializeRayMarkers();
             auto *sink = new AttackAnimationGraphEventSink();
             player->AddAnimationGraphEventSink(sink);
             logger::info("Event Sink Created");
@@ -213,7 +263,10 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse)
     SKSE::Init(skse);
 
     SetupLog();
-    spdlog::set_level(spdlog::level::debug);
+    if (debugMode)
+        spdlog::set_level(spdlog::level::debug);
+    else
+        spdlog::set_level(spdlog::level::info);
 
     logger::info("Animation Ledge Block NG Plugin Starting");
 

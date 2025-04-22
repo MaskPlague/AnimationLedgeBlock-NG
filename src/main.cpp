@@ -1,12 +1,23 @@
-#include <spdlog/sinks/basic_file_sink.h>
-
 namespace logger = SKSE::log;
 
-bool debugMode = false;
+static bool debugMode = false;
+static bool physicalBlocker = true;
+static float dropThreshold = 150.0f; // 1.5x 1.0 player height
 
-bool isAttacking = false;
-bool eventSinkStarted = false;
-RE::NiPoint3 globalPlayerPos = RE::NiPoint3();
+static bool isAttacking = false;
+static bool movedBlocker = false;
+static RE::TESObjectREFR *ledgeBlocker;
+static RE::NiPoint3 previousPosition;
+
+static float bestYaw = 0.0f;
+static float bestDist = -1.0f;
+
+static int untilMoveAgain = 0;
+static int untilMomentHide = 0;
+
+const int numRays = 12; // Number of rays to create.
+constexpr int kRayMarkerCount = 12;
+static std::vector<RE::TESObjectREFR *> rayMarkers;
 
 void SetupLog()
 {
@@ -21,8 +32,55 @@ void SetupLog()
     spdlog::set_level(spdlog::level::trace);
     spdlog::flush_on(spdlog::level::trace);
 }
-constexpr int kRayMarkerCount = 12;
-static std::vector<RE::TESObjectREFR *> rayMarkers;
+
+void LoadConfig()
+{
+    CSimpleIniA ini;
+    ini.SetUnicode(); // if you want UTF‑8 support
+
+    SI_Error rc = ini.LoadFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
+    if (rc < 0)
+    {
+        logger::warn("Could not load AnimationLedgeBlockNG.ini, using defaults");
+    }
+
+    // Read values:
+    physicalBlocker = ini.GetBoolValue("General", "PhysicalBlocker", true);
+    dropThreshold = static_cast<float>(ini.GetDoubleValue("General", "DropThreshold", 150.0f));
+    debugMode = ini.GetBoolValue("General", "DebugMode", false);
+
+    // Optionally write defaults back for any missing keys:
+    ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);
+    ini.SetDoubleValue("General", "DropThreshold", static_cast<double>(dropThreshold));
+    ini.SetBoolValue("Debug", "Enable", debugMode);
+    ini.SaveFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
+}
+
+bool CreateLedgeBlocker()
+{
+    auto *handler = RE::TESDataHandler::GetSingleton();
+    if (!handler)
+    {
+        logger::info("Error, could not get TESDataHandler");
+        return true;
+    }
+    auto *blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+    if (!blocker)
+    {
+        logger::info("Error, Could not access Animation Ledge Block NG.esp");
+        return true;
+    }
+    auto *player = RE::PlayerCharacter::GetSingleton();
+    if (!player)
+    {
+        logger::info("Error, Could not access the player");
+        return true;
+    }
+    auto placed = player->PlaceObjectAtMe(blocker, true);
+    placed->SetPosition(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ() - 10000);
+    ledgeBlocker = placed.get();
+    return false;
+}
 
 // Call this once to spawn them near the player
 void InitializeRayMarkers()
@@ -34,7 +92,9 @@ void InitializeRayMarkers()
         return; // Already initialized
     }
 
-    auto markerBase = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0004e4e6);
+    auto markerBase = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00063B45);
+    // meridias beacon 0004e4e6
+    // garnet 00063B45
     if (!markerBase || !player)
     {
         return;
@@ -51,14 +111,38 @@ void InitializeRayMarkers()
 
     for (int i = 0; i < kRayMarkerCount; ++i)
     {
-        player->PlaceObjectAtMe(markerBase, true);
         auto placed = player->PlaceObjectAtMe(markerBase, true);
         if (placed)
         {
-            placed->SetPosition(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ() + 200);
+            placed->SetPosition(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ() + 50);
             rayMarkers.push_back(placed.get());
         }
     }
+}
+
+float GetPlayerDistanceToGround(auto player, auto world)
+{
+    auto playerPos = player->GetPosition();
+    auto start = playerPos;
+    auto end = start - RE::NiPoint3{0.0f, 0.0f, 60.0f};
+    const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
+    RE::bhkPickData pickData{};
+    RE::NiPoint3 rayFrom{start.x, start.y, start.z};
+    RE::NiPoint3 rayTo{end.x, end.y, end.z};
+    pickData.rayInput.from = rayFrom * havokWorldScale;
+    pickData.rayInput.to = rayTo * havokWorldScale;
+    uint32_t collisionFilterInfo = 0;
+    player->GetCollisionFilterInfo(collisionFilterInfo);
+    pickData.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
+    if (world->PickObject(pickData) && pickData.rayOutput.HasHit())
+    {
+        RE::NiPoint3 delta = rayTo - rayFrom;
+        RE::NiPoint3 hitPos = rayFrom + delta * pickData.rayOutput.hitFraction;
+        // Compute the vertical distance
+        return playerPos.z - hitPos.z;
+    }
+
+    return 0.0f; // No hit = airborne or over void
 }
 
 bool IsLedgeAhead()
@@ -75,44 +159,54 @@ bool IsLedgeAhead()
     if (!bhkWorld)
         return false;
 
+    if (player->IsInMidair() && physicalBlocker)
+    {
+        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
+        if (distFromGround == 0.0f)
+            return false;
+    }
+
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
-    const float rayLength = 600.0f; // probably could be shorter
-    const float ledgeDistance = 50.0f;
-    const float dropThreshold = 200.0f;    // 2x 1.0 player height
+    const float rayLength = 600.0f;        // 600.0f; // probably could be shorter
+    const float ledgeDistance = 50.0f;     // 50.0 units around the player
     const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
     const float directionThreshold = 0.7f; // Adjust for tighter/looser direction matching
+    bestDist = -1.0f;
+    bestYaw = 0.0f;
 
     RE::NiPoint3 playerPos = player->GetPosition();
     RE::NiPoint3 currentLinearVelocity;
     player->GetLinearVelocity(currentLinearVelocity);
-    // z is not important
-    currentLinearVelocity.z = 0.0f;
+    currentLinearVelocity.z = 0.0f; // z is not important
     float velocityLength = currentLinearVelocity.Length();
 
-    // where to force the player to move, this fights AMR so players aren't forced off the ledge.
     RE::NiPoint3 moveDirection = {0.0f, 0.0f, 0.0f};
     if (velocityLength > 0.0f)
     {
         moveDirection = currentLinearVelocity / velocityLength;
-        globalPlayerPos = playerPos - (moveDirection * 5.0f);
+        if (!physicalBlocker)
+            previousPosition = playerPos - (moveDirection * 5.0f);
     }
-    else
+    else if (!physicalBlocker)
     {
-        globalPlayerPos = playerPos;
+        previousPosition = playerPos;
     }
 
     // Yaw offsets to use for rays around the player
+    float playerYaw = player->GetAngleZ();
     std::vector<float> yawOffsets;
-    const int numRays = 12; // Number of rays to create.
-    const float angleStep = static_cast<float>(2.0 * std::_Pi_val / static_cast<long double>(numRays));
+
+    const float angleStep = static_cast<float>(2.0 * RE::NI_PI / static_cast<long double>(numRays));
     for (int i = 0; i < numRays; ++i)
     {
-        yawOffsets.push_back(i * angleStep);
+        yawOffsets.push_back(playerYaw + i * angleStep);
     }
-
     int i = 0; // increment into ray markers
+    bool ledgeDetected = false;
+    std::vector<float> validYaws;
     for (float yaw : yawOffsets)
     {
+        bool consider = true;
         RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
         float dirLength = dirVec.Length();
         if (dirLength == 0.0f)
@@ -125,8 +219,14 @@ bool IsLedgeAhead()
         {
             float alignment = normalizedDir.Dot(moveDirection);
             if (alignment < directionThreshold)
-                continue;
+            {
+                if (!physicalBlocker)
+                    continue;
+                consider = false;
+            }
         }
+        else
+            consider = false;
 
         RE::NiPoint3 rayFrom = playerPos + (normalizedDir * ledgeDistance) + RE::NiPoint3(0, 0, 250);
         RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
@@ -139,6 +239,7 @@ bool IsLedgeAhead()
         uint32_t collisionFilterInfo = 0;
         player->GetCollisionFilterInfo(collisionFilterInfo);
         ray.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
+        //---------------------------------------------
 
         if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
         {
@@ -152,35 +253,54 @@ bool IsLedgeAhead()
                 i++;
             }
 
-            logger::trace("player z {}", playerPos.z);
-            bool debugTest = true;
             if (hitPos.z > playerPos.z - maxStepUpHeight)
             {
-                logger::trace("Hit surface is above playerPos.z — likely a wall.");
-                if (debugMode)
-                    debugTest = false;
-                else
+                // logger::trace("Hit surface is above playerPos.z — step height");
+                if (!physicalBlocker)
                     return false;
+                continue;
             }
 
             float verticalDrop = playerPos.z - hitPos.z;
-            logger::trace("Ledge drop at {:.2f} units ahead: {:.2f} units down", ledgeDistance, verticalDrop);
 
-            if (verticalDrop > dropThreshold && debugTest)
+            if (verticalDrop > dropThreshold && consider)
             {
-                logger::trace("Ledge detected!");
-                return true;
+                if (!physicalBlocker)
+                    return true;
+                ledgeDetected = true;
+                validYaws.push_back(yaw);
             }
         }
-        else
+        else if (consider && physicalBlocker)
         {
-            logger::trace("No surface hit ahead — definite ledge.");
-            return true;
+            ledgeDetected = true;
+            validYaws.push_back(yaw);
         }
+        else if (!physicalBlocker)
+            return true;
     }
-
-    return false;
+    if (physicalBlocker && !validYaws.empty())
+    {
+        int index = static_cast<int>(validYaws.size() / 2);
+        bestYaw = validYaws[index];
+    }
+    if (!physicalBlocker)
+        return false;
+    return ledgeDetected;
 }
+
+// Taken from Better Grabbing
+void SetAngle(RE::TESObjectREFR *ref, const RE::NiPoint3 &a_position)
+{
+    if (!ref)
+    {
+        return;
+    }
+    using func_t = void(RE::TESObjectREFR *, const RE::NiPoint3 &);
+    const REL::Relocation<func_t> func{RELOCATION_ID(19359, 19786)};
+    return func(ref, a_position);
+}
+//----------------------------
 
 // Force the player to stop moving toward their original vector
 void StopPlayerVelocity()
@@ -189,11 +309,28 @@ void StopPlayerVelocity()
     if (!player)
         return;
     player->StopMoving(0.0f);
-    if (auto *controller = player->GetCharController(); controller)
+    auto *controller = player->GetCharController();
+    if (!controller)
+        return;
+    controller->SetLinearVelocityImpl(RE::hkVector4());
+    if (!physicalBlocker)
     {
-        controller->SetLinearVelocityImpl(RE::hkVector4());
+        player->SetPosition(previousPosition, true);
     }
-    player->SetPosition(globalPlayerPos, true);
+    else
+    {
+        auto playerPos = player->GetPosition();
+        if (!movedBlocker)
+        {
+            RE::NiPoint3 objDir(std::sin(bestYaw), std::cos(bestYaw), 0.0f);
+            objDir.Unitize();
+            RE::NiPoint3 objPos = playerPos - (objDir * 10.0f);
+            ledgeBlocker->SetPosition(objPos.x, objPos.y, playerPos.z + 60);
+            movedBlocker = true;
+            SetAngle(ledgeBlocker, {0.0f, 0.0f, bestYaw});
+            ledgeBlocker->Update3DPosition(true);
+        }
+    }
 }
 
 class AttackAnimationGraphEventSink : public RE::BSTEventSink<RE::BSAnimationGraphEvent>
@@ -205,34 +342,97 @@ public:
         {
             return RE::BSEventNotifyControl::kStop;
         }
-        logger::debug("Payload: {}", event->payload);
-        logger::debug("Tag: {}\n", event->tag);
+        // logger::debug("Payload: {}", event->payload);
+        // logger::debug("Tag: {}\n", event->tag);
         if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" || event->tag == "RollTrigger"))
         {
             isAttacking = true;
             logger::debug("Animation Started");
+            untilMoveAgain = 0;
+            untilMomentHide = 0;
         }
         else if (isAttacking && (event->tag == "attackStop" || event->payload == "$DMCO_Reset" || event->tag == "RollStop"))
         {
             isAttacking = false;
+            movedBlocker = false;
+            if (physicalBlocker)
+                ledgeBlocker->SetPosition(ledgeBlocker->GetPositionX(), ledgeBlocker->GetPositionY(), -10000.0f);
             logger::debug("Animation Finished");
         }
 
         return RE::BSEventNotifyControl::kContinue;
     }
-};
 
+    static AttackAnimationGraphEventSink *GetSingleton()
+    {
+        static AttackAnimationGraphEventSink singleton;
+        return &singleton;
+    }
+};
+void CellChangeCheck()
+{
+    if (!physicalBlocker)
+        return;
+    static RE::TESObjectCELL *lastPlayerCell;
+    auto *player = RE::PlayerCharacter::GetSingleton();
+    if (!player)
+        return;
+
+    if (!ledgeBlocker)
+        return;
+
+    if (!ledgeBlocker->GetParentCell())
+        return;
+    auto *currentCell = player->GetParentCell();
+
+    if (currentCell != lastPlayerCell)
+    {
+        lastPlayerCell = currentCell;
+        if (ledgeBlocker)
+        {
+            ledgeBlocker->SetParentCell(currentCell);
+            ledgeBlocker->SetPosition(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ() - 10000.0f);
+        }
+    }
+}
 void EdgeCheck()
 {
-    if (IsLedgeAhead() && isAttacking)
+    if (!physicalBlocker)
     {
-        StopPlayerVelocity();
-        logger::trace("Cliff detected");
+        if (IsLedgeAhead() && isAttacking)
+        {
+            StopPlayerVelocity();
+        }
     }
     else
     {
-        globalPlayerPos = RE::NiPoint3();
+        if (IsLedgeAhead() && isAttacking)
+        {
+            untilMoveAgain++;
+            StopPlayerVelocity();
+        }
+        else if (isAttacking)
+            untilMoveAgain++;
+
+        if (untilMoveAgain > 50)
+        {
+            untilMoveAgain = 0;
+            movedBlocker = false;
+            untilMomentHide++;
+        }
+        if (untilMomentHide > 3)
+        {
+            untilMomentHide = 0;
+            movedBlocker = false;
+            ledgeBlocker->SetPosition(ledgeBlocker->GetPositionX(), ledgeBlocker->GetPositionY(), -10000.0f);
+        }
     }
+}
+
+bool IsGameWindowFocused()
+{
+    static const HWND gameWindow = ::FindWindow(nullptr, L"Skyrim Special Edition");
+    return ::GetForegroundWindow() == gameWindow;
 }
 
 void LoopEdgeCheck()
@@ -241,41 +441,42 @@ void LoopEdgeCheck()
     std::thread([&]
                 {while (true) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(11));
-                    SKSE::GetTaskInterface()->AddTask([&]{ EdgeCheck(); });
+                    if (!IsGameWindowFocused())
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Pause polling
+                        continue;
+                    }
+                    SKSE::GetTaskInterface()->AddTask([&]{ EdgeCheck(); CellChangeCheck(); });
             } })
         .detach();
 }
 
 void OnPostLoadGame()
 {
-    auto *player = RE::PlayerCharacter::GetSingleton();
-    if (player)
+    logger::info("Creating Event Sink");
+    try
     {
-        logger::info("Creating Event Sink");
-        try
-        {
-            if (debugMode)
-                InitializeRayMarkers();
-            auto *sink = new AttackAnimationGraphEventSink();
-            player->AddAnimationGraphEventSink(sink);
-            logger::info("Event Sink Created");
-            LoopEdgeCheck();
-        }
-        catch (...)
-        {
-            logger::info("Failed to Create Event Sink");
-        }
+        if (debugMode)
+            InitializeRayMarkers();
+        if (physicalBlocker)
+            CreateLedgeBlocker();
+        RE::PlayerCharacter::GetSingleton()->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
+        logger::info("Event Sink Created");
+        LoopEdgeCheck();
     }
-    else
-        logger::info("Failed to Create Event Sink as Player Could not be Retrieved");
+    catch (...)
+    {
+        logger::info("Failed to Create Event Sink");
+    }
 }
 
 void MessageHandler(SKSE::MessagingInterface::Message *msg)
 {
-    if (msg->type == SKSE::MessagingInterface::kPostLoadGame)
-    {
-        OnPostLoadGame();
-    }
+    if (msg->type != SKSE::MessagingInterface::kPostLoadGame)
+        return;
+    if (!bool(msg->data))
+        return;
+    OnPostLoadGame();
 }
 
 SKSEPluginLoad(const SKSE::LoadInterface *skse)
@@ -284,7 +485,7 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse)
 
     SetupLog();
     if (debugMode)
-        spdlog::set_level(spdlog::level::debug);
+        spdlog::set_level(spdlog::level::trace);
     else
         spdlog::set_level(spdlog::level::info);
 
@@ -294,6 +495,6 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse)
     messaging->RegisterListener("SKSE", MessageHandler);
 
     logger::info("Animation Ledge Block NG Plugin Loaded");
-
+    LoadConfig();
     return true;
 }

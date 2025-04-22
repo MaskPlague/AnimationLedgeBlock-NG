@@ -344,14 +344,14 @@ public:
         }
         // logger::debug("Payload: {}", event->payload);
         // logger::debug("Tag: {}\n", event->tag);
-        if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" || event->tag == "RollTrigger"))
+        if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" || event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart"))
         {
             isAttacking = true;
             logger::debug("Animation Started");
             untilMoveAgain = 0;
             untilMomentHide = 0;
         }
-        else if (isAttacking && (event->tag == "attackStop" || event->payload == "$DMCO_Reset" || event->tag == "RollStop"))
+        else if (isAttacking && (event->tag == "attackStop" || event->payload == "$DMCO_Reset" || event->tag == "RollStop" || event->tag == "TKDR_DodgeEnd"))
         {
             isAttacking = false;
             movedBlocker = false;

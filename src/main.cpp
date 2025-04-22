@@ -47,7 +47,7 @@ void LoadConfig()
     // Read values:
     physicalBlocker = ini.GetBoolValue("General", "PhysicalBlocker", true);
     dropThreshold = static_cast<float>(ini.GetDoubleValue("General", "DropThreshold", 150.0f));
-    debugMode = ini.GetBoolValue("General", "DebugMode", false);
+    debugMode = ini.GetBoolValue("Debug", "Enable", false);
 
     // Optionally write defaults back for any missing keys:
     ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);
@@ -342,17 +342,29 @@ public:
         {
             return RE::BSEventNotifyControl::kStop;
         }
-        // logger::debug("Payload: {}", event->payload);
-        // logger::debug("Tag: {}\n", event->tag);
-        if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" || event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart"))
+        logger::trace("Payload: {}", event->payload);
+        logger::trace("Tag: {}\n", event->tag);
+        static int type = 0;
+        if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
+                             event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart"))
         {
             isAttacking = true;
             logger::debug("Animation Started");
             untilMoveAgain = 0;
             untilMomentHide = 0;
+            if (event->tag == "PowerAttack_Start_end")
+                type = 1;
+            else if (event->tag == "MCO_DodgeInitiate")
+                type = 2;
+            else if (event->tag == "RollTrigger")
+                type = 3;
+            else if (event->tag == "TKDR_DodgeStart")
+                type = 4;
         }
-        else if (isAttacking && (event->tag == "attackStop" || event->payload == "$DMCO_Reset" || event->tag == "RollStop" || event->tag == "TKDR_DodgeEnd"))
+        else if (isAttacking && ((type == 1 && event->tag == "attackStop") || (type == 2 && event->payload == "$DMCO_Reset") ||
+                                 (type == 3 && event->tag == "RollStop") || (type == 4 && event->tag == "TKDR_DodgeEnd")))
         {
+            type = 0;
             isAttacking = false;
             movedBlocker = false;
             if (physicalBlocker)
@@ -484,6 +496,7 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse)
     SKSE::Init(skse);
 
     SetupLog();
+    LoadConfig();
     if (debugMode)
         spdlog::set_level(spdlog::level::trace);
     else
@@ -495,6 +508,6 @@ SKSEPluginLoad(const SKSE::LoadInterface *skse)
     messaging->RegisterListener("SKSE", MessageHandler);
 
     logger::info("Animation Ledge Block NG Plugin Loaded");
-    LoadConfig();
+
     return true;
 }

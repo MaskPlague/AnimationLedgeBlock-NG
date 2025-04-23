@@ -3,6 +3,7 @@ namespace logger = SKSE::log;
 static bool debugMode = false;
 static bool physicalBlocker = true;
 static float dropThreshold = 150.0f; // 1.5x 1.0 player height
+static int physicalBlockerType = 0;
 
 static bool isAttacking = false;
 static bool movedBlocker = false;
@@ -46,11 +47,13 @@ void LoadConfig()
 
     // Read values:
     physicalBlocker = ini.GetBoolValue("General", "PhysicalBlocker", true);
+    physicalBlockerType = ini.GetLongValue("General", "PhysicalBlockerType", 0);
     dropThreshold = static_cast<float>(ini.GetDoubleValue("General", "DropThreshold", 150.0f));
     debugMode = ini.GetBoolValue("Debug", "Enable", false);
 
     // Optionally write defaults back for any missing keys:
     ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);
+    ini.SetLongValue("General", "PhysicalBlockerType", physicalBlockerType);
     ini.SetDoubleValue("General", "DropThreshold", static_cast<double>(dropThreshold));
     ini.SetBoolValue("Debug", "Enable", debugMode);
     ini.SaveFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
@@ -64,7 +67,19 @@ bool CreateLedgeBlocker()
         logger::info("Error, could not get TESDataHandler");
         return true;
     }
-    auto *blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+    RE::TESObjectSTAT *blocker;
+    switch (physicalBlockerType)
+    {
+    case 0: // Half Ring wall
+        blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+    case 1: // Full Ring
+        blocker = handler->LookupForm<RE::TESObjectSTAT>(0x801, "Animation Ledge Block NG.esp");
+    case 2: // Shallow wall
+        blocker = handler->LookupForm<RE::TESObjectSTAT>(0x802, "Animation Ledge Block NG.esp");
+    default: // Default Half Ring wall
+        blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+    }
+    logger::trace("using blocker type {}", physicalBlockerType);
     if (!blocker)
     {
         logger::info("Error, Could not access Animation Ledge Block NG.esp");

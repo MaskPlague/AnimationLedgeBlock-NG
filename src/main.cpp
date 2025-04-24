@@ -360,11 +360,11 @@ public:
         logger::trace("Payload: {}", event->payload);
         logger::trace("Tag: {}\n", event->tag);
         static int type = 0;
-        if (!isAttacking && (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
-                             event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart"))
+        if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
+            event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart")
         {
             isAttacking = true;
-            logger::debug("Animation Started");
+            logger::debug("\nAnimation Started");
             untilMoveAgain = 0;
             untilMomentHide = 0;
             if (event->tag == "PowerAttack_Start_end")
@@ -384,7 +384,7 @@ public:
             movedBlocker = false;
             if (physicalBlocker)
                 ledgeBlocker->SetPosition(ledgeBlocker->GetPositionX(), ledgeBlocker->GetPositionY(), -10000.0f);
-            logger::debug("Animation Finished");
+            logger::debug("\nAnimation Finished");
         }
 
         return RE::BSEventNotifyControl::kContinue;

@@ -6,6 +6,7 @@ static float dropThreshold = 150.0f; // 1.5x 1.0 player height
 static int physicalBlockerType = 0;
 
 static bool isAttacking = false;
+static bool isLooping = false;
 static bool movedBlocker = false;
 static RE::TESObjectREFR *ledgeBlocker;
 static RE::NiPoint3 previousPosition;
@@ -153,7 +154,6 @@ float GetPlayerDistanceToGround(auto player, auto world)
     {
         RE::NiPoint3 delta = rayTo - rayFrom;
         RE::NiPoint3 hitPos = rayFrom + delta * pickData.rayOutput.hitFraction;
-        // Compute the vertical distance
         return playerPos.z - hitPos.z;
     }
 
@@ -174,15 +174,8 @@ bool IsLedgeAhead()
     if (!bhkWorld)
         return false;
 
-    if (player->IsInMidair() && physicalBlocker)
-    {
-        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
-        if (distFromGround == 0.0f)
-            return false;
-    }
-
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
-    const float rayLength = 600.0f;        // 600.0f; // probably could be shorter
+    const float rayLength = 600.0f;        // 600.0f
     const float ledgeDistance = 50.0f;     // 50.0 units around the player
     const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
     const float directionThreshold = 0.7f; // Adjust for tighter/looser direction matching
@@ -219,6 +212,7 @@ bool IsLedgeAhead()
     int i = 0; // increment into ray markers
     bool ledgeDetected = false;
     std::vector<float> validYaws;
+    bool anyNotLedge = false;
     for (float yaw : yawOffsets)
     {
         bool consider = true;
@@ -243,7 +237,7 @@ bool IsLedgeAhead()
         else
             consider = false;
 
-        RE::NiPoint3 rayFrom = playerPos + (normalizedDir * ledgeDistance) + RE::NiPoint3(0, 0, 250);
+        RE::NiPoint3 rayFrom = playerPos + (normalizedDir * ledgeDistance) + RE::NiPoint3(0, 0, 80);
         RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
 
         RE::bhkPickData ray;
@@ -273,6 +267,7 @@ bool IsLedgeAhead()
                 // logger::trace("Hit surface is above playerPos.z — step height");
                 if (!physicalBlocker)
                     return false;
+                anyNotLedge = true;
                 continue;
             }
 
@@ -285,6 +280,8 @@ bool IsLedgeAhead()
                 ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
+            else
+                anyNotLedge = true;
         }
         else if (consider && physicalBlocker)
         {
@@ -301,6 +298,12 @@ bool IsLedgeAhead()
     }
     if (!physicalBlocker)
         return false;
+    if (player->IsInMidair() /*&& physicalBlocker*/ && anyNotLedge)
+    {
+        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
+        if (distFromGround == 0.0f)
+            return false;
+    }
     return ledgeDetected;
 }
 
@@ -347,55 +350,6 @@ void StopPlayerVelocity()
         }
     }
 }
-
-class AttackAnimationGraphEventSink : public RE::BSTEventSink<RE::BSAnimationGraphEvent>
-{
-public:
-    RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent *event, RE::BSTEventSource<RE::BSAnimationGraphEvent> *)
-    {
-        if (!event)
-        {
-            return RE::BSEventNotifyControl::kStop;
-        }
-        logger::trace("Payload: {}", event->payload);
-        logger::trace("Tag: {}\n", event->tag);
-        static int type = 0;
-        if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
-            event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart")
-        {
-            isAttacking = true;
-            logger::debug("\nAnimation Started");
-            untilMoveAgain = 0;
-            untilMomentHide = 0;
-            if (event->tag == "PowerAttack_Start_end")
-                type = 1;
-            else if (event->tag == "MCO_DodgeInitiate")
-                type = 2;
-            else if (event->tag == "RollTrigger")
-                type = 3;
-            else if (event->tag == "TKDR_DodgeStart")
-                type = 4;
-        }
-        else if (isAttacking && ((type == 1 && event->tag == "attackStop") || (type == 2 && event->payload == "$DMCO_Reset") ||
-                                 (type == 3 && event->tag == "RollStop") || (type == 4 && event->tag == "TKDR_DodgeEnd")))
-        {
-            type = 0;
-            isAttacking = false;
-            movedBlocker = false;
-            if (physicalBlocker)
-                ledgeBlocker->SetPosition(ledgeBlocker->GetPositionX(), ledgeBlocker->GetPositionY(), -10000.0f);
-            logger::debug("\nAnimation Finished");
-        }
-
-        return RE::BSEventNotifyControl::kContinue;
-    }
-
-    static AttackAnimationGraphEventSink *GetSingleton()
-    {
-        static AttackAnimationGraphEventSink singleton;
-        return &singleton;
-    }
-};
 void CellChangeCheck()
 {
     if (!physicalBlocker)
@@ -466,7 +420,7 @@ void LoopEdgeCheck()
 {
     logger::debug("Loop starting");
     std::thread([&]
-                {while (true) {
+                {while (isAttacking) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(11));
                     if (!IsGameWindowFocused())
                     {
@@ -478,6 +432,58 @@ void LoopEdgeCheck()
         .detach();
 }
 
+class AttackAnimationGraphEventSink : public RE::BSTEventSink<RE::BSAnimationGraphEvent>
+{
+public:
+    RE::BSEventNotifyControl ProcessEvent(const RE::BSAnimationGraphEvent *event, RE::BSTEventSource<RE::BSAnimationGraphEvent> *)
+    {
+        if (!event)
+        {
+            return RE::BSEventNotifyControl::kStop;
+        }
+        logger::trace("Payload: {}", event->payload);
+        logger::trace("Tag: {}\n", event->tag);
+        static int type = 0;
+        if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
+            event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart")
+        {
+            isAttacking = true;
+            logger::debug("\nAnimation Started");
+            if (!isLooping)
+                LoopEdgeCheck();
+            isLooping = true;
+            untilMoveAgain = 0;
+            untilMomentHide = 0;
+            if (event->tag == "PowerAttack_Start_end")
+                type = 1;
+            else if (event->tag == "MCO_DodgeInitiate")
+                type = 2;
+            else if (event->tag == "RollTrigger")
+                type = 3;
+            else if (event->tag == "TKDR_DodgeStart")
+                type = 4;
+        }
+        else if (isAttacking && ((type == 1 && event->tag == "attackStop") || (type == 2 && event->payload == "$DMCO_Reset") ||
+                                 (type == 3 && event->tag == "RollStop") || (type == 4 && event->tag == "TKDR_DodgeEnd")))
+        {
+            type = 0;
+            isAttacking = false;
+            isLooping = false;
+            movedBlocker = false;
+            if (physicalBlocker)
+                ledgeBlocker->SetPosition(ledgeBlocker->GetPositionX(), ledgeBlocker->GetPositionY(), -10000.0f);
+            logger::debug("\nAnimation Finished");
+        }
+
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
+    static AttackAnimationGraphEventSink *GetSingleton()
+    {
+        static AttackAnimationGraphEventSink singleton;
+        return &singleton;
+    }
+};
 void OnPostLoadGame()
 {
     logger::info("Creating Event Sink");

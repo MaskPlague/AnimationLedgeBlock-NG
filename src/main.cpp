@@ -218,7 +218,6 @@ bool IsLedgeAhead()
     const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
     const float directionThreshold = 0.7f; // Adjust for tighter/looser direction matching
     bestDist = -1.0f;
-    bestYaw = 0.0f;
 
     RE::NiPoint3 playerPos = player->GetPosition();
     RE::NiPoint3 currentLinearVelocity;

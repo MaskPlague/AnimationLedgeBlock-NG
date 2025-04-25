@@ -57,8 +57,10 @@ void LoadConfig()
     if (dropThreshold > 600.0f)
         dropThreshold = 590.0f;
     ledgeDistance = static_cast<float>(ini.GetDoubleValue("General", "LedgeDistance", 50.0f));
-    if (ledgeDistance < 50.0f)
+    if (physicalBlocker && ledgeDistance < 50.0f)
         ledgeDistance = 50.0f;
+    else if (!physicalBlocker && ledgeDistance < 10.0f)
+        ledgeDistance = 10.0f;
     groundLeeway = static_cast<float>(ini.GetDoubleValue("General", "GroundLeeway", 60.0f));
 
     debugMode = ini.GetBoolValue("Debug", "Enable", false);

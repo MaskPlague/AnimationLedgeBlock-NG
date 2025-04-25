@@ -3,9 +3,13 @@ namespace logger = SKSE::log;
 static bool debugMode = false;
 static bool physicalBlocker = true;
 static float dropThreshold = 150.0f; // 1.5x 1.0 player height
+static float ledgeDistance = 50.0f;  // 50.0 units around the player
+static float groundLeeway = 60.0f;
 static int physicalBlockerType = 0;
 
 static bool isAttacking = false;
+static bool isOnLedge = false;
+static int loops = 0;
 static bool isLooping = false;
 static bool movedBlocker = false;
 static RE::TESObjectREFR *ledgeBlocker;
@@ -38,7 +42,7 @@ void SetupLog()
 void LoadConfig()
 {
     CSimpleIniA ini;
-    ini.SetUnicode(); // if you want UTF‑8 support
+    ini.SetUnicode();
 
     SI_Error rc = ini.LoadFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
     if (rc < 0)
@@ -50,12 +54,21 @@ void LoadConfig()
     physicalBlocker = ini.GetBoolValue("General", "PhysicalBlocker", true);
     physicalBlockerType = ini.GetLongValue("General", "PhysicalBlockerType", 0);
     dropThreshold = static_cast<float>(ini.GetDoubleValue("General", "DropThreshold", 150.0f));
+    if (dropThreshold > 600.0f)
+        dropThreshold = 590.0f;
+    ledgeDistance = static_cast<float>(ini.GetDoubleValue("General", "LedgeDistance", 50.0f));
+    if (ledgeDistance < 50.0f)
+        ledgeDistance = 50.0f;
+    groundLeeway = static_cast<float>(ini.GetDoubleValue("General", "GroundLeeway", 60.0f));
+
     debugMode = ini.GetBoolValue("Debug", "Enable", false);
 
     // Optionally write defaults back for any missing keys:
     ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);
     ini.SetLongValue("General", "PhysicalBlockerType", physicalBlockerType);
     ini.SetDoubleValue("General", "DropThreshold", static_cast<double>(dropThreshold));
+    ini.SetDoubleValue("General", "LedgeDistance", static_cast<double>(ledgeDistance));
+    ini.SetDoubleValue("General", "GroundLeeway", static_cast<double>(groundLeeway));
     ini.SetBoolValue("Debug", "Enable", debugMode);
     ini.SaveFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
 }
@@ -140,7 +153,7 @@ float GetPlayerDistanceToGround(auto player, auto world)
 {
     auto playerPos = player->GetPosition();
     auto start = playerPos;
-    auto end = start - RE::NiPoint3{0.0f, 0.0f, 60.0f};
+    auto end = start - RE::NiPoint3{0.0f, 0.0f, groundLeeway};
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
     RE::bhkPickData pickData{};
     RE::NiPoint3 rayFrom{start.x, start.y, start.z};
@@ -175,8 +188,8 @@ bool IsLedgeAhead()
         return false;
 
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
-    const float rayLength = 600.0f;        // 600.0f
-    const float ledgeDistance = 50.0f;     // 50.0 units around the player
+    const float rayLength = 600.0f; // 600.0f
+
     const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
     const float directionThreshold = 0.7f; // Adjust for tighter/looser direction matching
     bestDist = -1.0f;
@@ -212,7 +225,6 @@ bool IsLedgeAhead()
     int i = 0; // increment into ray markers
     bool ledgeDetected = false;
     std::vector<float> validYaws;
-    bool anyNotLedge = false;
     for (float yaw : yawOffsets)
     {
         bool consider = true;
@@ -265,9 +277,8 @@ bool IsLedgeAhead()
             if (hitPos.z > playerPos.z - maxStepUpHeight)
             {
                 // logger::trace("Hit surface is above playerPos.z — step height");
-                if (!physicalBlocker)
-                    return false;
-                anyNotLedge = true;
+                // if (!physicalBlocker)
+                //    return false;
                 continue;
             }
 
@@ -275,34 +286,38 @@ bool IsLedgeAhead()
 
             if (verticalDrop > dropThreshold && consider)
             {
-                if (!physicalBlocker)
-                    return true;
+                // if (!physicalBlocker)
+                //     return true;
                 ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
-            else
-                anyNotLedge = true;
         }
         else if (consider && physicalBlocker)
         {
             ledgeDetected = true;
             validYaws.push_back(yaw);
         }
-        else if (!physicalBlocker)
-            return true;
+        // else if (!physicalBlocker)
+        //     return true;
     }
     if (physicalBlocker && !validYaws.empty())
     {
         int index = static_cast<int>(validYaws.size() / 2);
         bestYaw = validYaws[index];
     }
-    if (!physicalBlocker)
-        return false;
-    if (player->IsInMidair() /*&& physicalBlocker*/ && anyNotLedge)
+    // if (!physicalBlocker)
+    //     return false;
+    if (player->IsInMidair())
     {
         auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
         if (distFromGround == 0.0f)
             return false;
+    }
+    loops++;
+    if (ledgeDetected || loops > 10)
+    {
+        isOnLedge = ledgeDetected;
+        loops = 0;
     }
     return ledgeDetected;
 }
@@ -380,7 +395,7 @@ void EdgeCheck()
 {
     if (!physicalBlocker)
     {
-        if (IsLedgeAhead() && isAttacking)
+        if (IsLedgeAhead() && isAttacking || isOnLedge)
         {
             StopPlayerVelocity();
         }
@@ -420,7 +435,7 @@ void LoopEdgeCheck()
 {
     logger::debug("Loop starting");
     std::thread([&]
-                {while (isAttacking) {
+                {while (isAttacking || isOnLedge) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(11));
                     if (!IsGameWindowFocused())
                     {
@@ -499,7 +514,7 @@ void OnPostLoadGame()
     }
     catch (...)
     {
-        logger::info("Failed to Create Event Sink");
+        logger::warn("Failed to Create Event Sink");
     }
 }
 
@@ -512,18 +527,17 @@ void MessageHandler(SKSE::MessagingInterface::Message *msg)
     OnPostLoadGame();
 }
 
-SKSEPluginLoad(const SKSE::LoadInterface *skse)
+extern "C" DLLEXPORT bool SKSEPlugin_Load(const SKSE::LoadInterface *skse)
 {
     SKSE::Init(skse);
 
     SetupLog();
+    logger::info("Animation Ledge Block NG Plugin Starting");
     LoadConfig();
     if (debugMode)
         spdlog::set_level(spdlog::level::trace);
     else
         spdlog::set_level(spdlog::level::info);
-
-    logger::info("Animation Ledge Block NG Plugin Starting");
 
     auto *messaging = SKSE::GetMessagingInterface();
     messaging->RegisterListener("SKSE", MessageHandler);

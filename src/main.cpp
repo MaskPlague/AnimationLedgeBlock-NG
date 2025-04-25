@@ -175,6 +175,29 @@ float GetPlayerDistanceToGround(auto player, auto world)
     return 0.0f; // No hit = airborne or over void
 }
 
+float AverageAngles(const std::vector<float> &angles)
+{
+    float x = 0.0f;
+    float y = 0.0f;
+
+    for (float angle : angles)
+    {
+        x += std::cos(angle);
+        y += std::sin(angle);
+    }
+
+    // Handle empty vector
+    if (x == 0.0f && y == 0.0f)
+        return 0.0f;
+
+    return std::atan2(y, x);
+}
+
+float NormalizeAngle(float angle)
+{
+    return std::fmod((angle + 2 * RE::NI_PI), (2 * RE::NI_PI));
+}
+
 bool IsLedgeAhead()
 {
     const auto player = RE::PlayerCharacter::GetSingleton();
@@ -302,10 +325,10 @@ bool IsLedgeAhead()
         // else if (!physicalBlocker)
         //     return true;
     }
-    if (physicalBlocker && !validYaws.empty())
+    if (!validYaws.empty())
     {
-        int index = static_cast<int>(validYaws.size() / 2);
-        bestYaw = validYaws[index];
+        float yaw = AverageAngles(validYaws);
+        bestYaw = NormalizeAngle(yaw);
     }
     // if (!physicalBlocker)
     //     return false;

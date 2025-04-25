@@ -13,7 +13,7 @@ static int loops = 0;
 static bool isLooping = false;
 static bool movedBlocker = false;
 static RE::TESObjectREFR *ledgeBlocker;
-static RE::NiPoint3 previousPosition;
+// static RE::NiPoint3 previousPosition;
 
 static float bestYaw = 0.0f;
 static float bestDist = -1.0f;
@@ -22,7 +22,7 @@ static int untilMoveAgain = 0;
 static int untilMomentHide = 0;
 
 const int numRays = 12; // Number of rays to create.
-constexpr int kRayMarkerCount = 12;
+constexpr int kRayMarkerCount = numRays;
 static std::vector<RE::TESObjectREFR *> rayMarkers;
 
 void SetupLog()
@@ -227,16 +227,16 @@ bool IsLedgeAhead()
     float velocityLength = currentLinearVelocity.Length();
 
     RE::NiPoint3 moveDirection = {0.0f, 0.0f, 0.0f};
-    if (velocityLength > 0.0f)
+    /*if (velocityLength > 0.0f)
     {
         moveDirection = currentLinearVelocity / velocityLength;
         if (!physicalBlocker)
-            previousPosition = playerPos - (moveDirection * 5.0f);
+            previousPosition = playerPos - (moveDirection * 2.0f);
     }
     else if (!physicalBlocker)
     {
         previousPosition = playerPos;
-    }
+    }*/
 
     // Yaw offsets to use for rays around the player
     float playerYaw = player->GetAngleZ();
@@ -311,8 +311,6 @@ bool IsLedgeAhead()
 
             if (verticalDrop > dropThreshold && consider)
             {
-                // if (!physicalBlocker)
-                //     return true;
                 ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
@@ -322,16 +320,12 @@ bool IsLedgeAhead()
             ledgeDetected = true;
             validYaws.push_back(yaw);
         }
-        // else if (!physicalBlocker)
-        //     return true;
     }
     if (!validYaws.empty())
     {
         float yaw = AverageAngles(validYaws);
         bestYaw = NormalizeAngle(yaw);
     }
-    // if (!physicalBlocker)
-    //     return false;
     if (player->IsInMidair())
     {
         auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
@@ -366,11 +360,11 @@ void StopPlayerVelocity()
     auto *player = RE::PlayerCharacter::GetSingleton();
     if (!player)
         return;
-    player->StopMoving(0.0f);
+    // player->StopMoving(0.0f);
     auto *controller = player->GetCharController();
     if (!controller)
         return;
-    controller->SetLinearVelocityImpl(RE::hkVector4());
+
     if (!physicalBlocker)
     {
         controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
@@ -379,11 +373,12 @@ void StopPlayerVelocity()
         auto backPos = pos - (dirVec * 4.0f);
         player->SetPosition(backPos, true);
     }
-    else
+    if (physicalBlocker)
     {
-        auto playerPos = player->GetPosition();
+        controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
         if (!movedBlocker)
         {
+            auto playerPos = player->GetPosition();
             RE::NiPoint3 objDir(std::sin(bestYaw), std::cos(bestYaw), 0.0f);
             objDir.Unitize();
             RE::NiPoint3 objPos = playerPos - (objDir * 10.0f);
@@ -459,7 +454,6 @@ bool IsGameWindowFocused()
     static const HWND gameWindow = ::FindWindow(nullptr, L"Skyrim Special Edition");
     return ::GetForegroundWindow() == gameWindow;
 }
-
 void LoopEdgeCheck()
 {
     logger::debug("Loop starting");
@@ -485,8 +479,8 @@ public:
         {
             return RE::BSEventNotifyControl::kStop;
         }
-        logger::trace("Payload: {}", event->payload);
-        logger::trace("Tag: {}\n", event->tag);
+        // logger::trace("Payload: {}", event->payload);
+        // logger::trace("Tag: {}\n", event->tag);
         static int type = 0;
         if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
             event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart")

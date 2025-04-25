@@ -373,7 +373,11 @@ void StopPlayerVelocity()
     controller->SetLinearVelocityImpl(RE::hkVector4());
     if (!physicalBlocker)
     {
-        player->SetPosition(previousPosition, true);
+        controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
+        auto pos = player->GetPosition();
+        RE::NiPoint3 dirVec(std::sin(bestYaw), std::cos(bestYaw), 0.0f);
+        auto backPos = pos - (dirVec * 4.0f);
+        player->SetPosition(backPos, true);
     }
     else
     {

@@ -6,6 +6,7 @@ static float dropThreshold = 150.0f; // 1.5x 1.0 player height
 static float ledgeDistance = 50.0f;  // 50.0 units around the player
 static float groundLeeway = 60.0f;
 static int physicalBlockerType = 0;
+static int memoryDuration = 10;
 
 static bool isAttacking = false;
 static bool isOnLedge = false;
@@ -63,6 +64,10 @@ void LoadConfig()
         ledgeDistance = 10.0f;
     groundLeeway = static_cast<float>(ini.GetDoubleValue("General", "GroundLeeway", 60.0f));
 
+    memoryDuration = ini.GetLongValue("General", "MemoryDuration", 10);
+    if (memoryDuration < 1)
+        memoryDuration = 1;
+
     debugMode = ini.GetBoolValue("Debug", "Enable", false);
 
     // Optionally write defaults back for any missing keys:
@@ -71,6 +76,7 @@ void LoadConfig()
     ini.SetDoubleValue("General", "DropThreshold", static_cast<double>(dropThreshold));
     ini.SetDoubleValue("General", "LedgeDistance", static_cast<double>(ledgeDistance));
     ini.SetDoubleValue("General", "GroundLeeway", static_cast<double>(groundLeeway));
+    ini.SetLongValue("General", "MemoryDuration", memoryDuration);
     ini.SetBoolValue("Debug", "Enable", debugMode);
     ini.SaveFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
 }
@@ -332,7 +338,7 @@ bool IsLedgeAhead()
             return false;
     }
     loops++;
-    if (ledgeDetected || loops > 10)
+    if (ledgeDetected || loops > memoryDuration)
     {
         isOnLedge = ledgeDetected;
         loops = 0;
@@ -359,7 +365,6 @@ void StopPlayerVelocity()
     auto *player = RE::PlayerCharacter::GetSingleton();
     if (!player)
         return;
-    // player->StopMoving(0.0f);
     auto *controller = player->GetCharController();
     if (!controller)
         return;

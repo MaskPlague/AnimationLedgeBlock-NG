@@ -230,18 +230,11 @@ bool IsLedgeAhead()
     player->GetLinearVelocity(currentLinearVelocity);
     currentLinearVelocity.z = 0.0f; // z is not important
     float velocityLength = currentLinearVelocity.Length();
-
     RE::NiPoint3 moveDirection = {0.0f, 0.0f, 0.0f};
-    /*if (velocityLength > 0.0f)
+    if (velocityLength > 0.0f)
     {
         moveDirection = currentLinearVelocity / velocityLength;
-        if (!physicalBlocker)
-            previousPosition = playerPos - (moveDirection * 2.0f);
     }
-    else if (!physicalBlocker)
-    {
-        previousPosition = playerPos;
-    }*/
 
     // Yaw offsets to use for rays around the player
     float playerYaw = player->GetAngleZ();
@@ -255,14 +248,14 @@ bool IsLedgeAhead()
     int i = 0; // increment into ray markers
     bool ledgeDetected = false;
     std::vector<float> validYaws;
+    bool consider;
     for (float yaw : yawOffsets)
     {
-        bool consider = true;
+        consider = true;
         RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
         float dirLength = dirVec.Length();
         if (dirLength == 0.0f)
             continue;
-
         RE::NiPoint3 normalizedDir = dirVec / dirLength;
 
         // Skip if we're moving and this direction doesn't match our movement
@@ -303,17 +296,15 @@ bool IsLedgeAhead()
                 marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
                 i++;
             }
-
             if (hitPos.z > playerPos.z - maxStepUpHeight)
             {
                 // logger::trace("Hit surface is above playerPos.z — step height");
-                // if (!physicalBlocker)
-                //    return false;
+                //  if (!physicalBlocker)
+                //     return false;
                 continue;
             }
 
             float verticalDrop = playerPos.z - hitPos.z;
-
             if (verticalDrop > dropThreshold && consider)
             {
                 ledgeDetected = true;

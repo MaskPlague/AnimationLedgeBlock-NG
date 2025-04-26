@@ -159,13 +159,11 @@ void InitializeRayMarkers()
 
 float GetPlayerDistanceToGround(auto player, auto world)
 {
-    auto playerPos = player->GetPosition();
-    auto start = playerPos;
-    auto end = start - RE::NiPoint3{0.0f, 0.0f, groundLeeway};
+    RE::NiPoint3 playerPos = player->GetPosition();
+    RE::NiPoint3 rayFrom = {playerPos.x, playerPos.y, playerPos.z + 80.0f};
+    RE::NiPoint3 rayTo = rayFrom - RE::NiPoint3{0.0f, 0.0f, groundLeeway + 80.0f};
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
     RE::bhkPickData pickData{};
-    RE::NiPoint3 rayFrom{start.x, start.y, start.z};
-    RE::NiPoint3 rayTo{end.x, end.y, end.z};
     pickData.rayInput.from = rayFrom * havokWorldScale;
     pickData.rayInput.to = rayTo * havokWorldScale;
     uint32_t collisionFilterInfo = 0;
@@ -322,17 +320,20 @@ bool IsLedgeAhead()
         float yaw = AverageAngles(validYaws);
         bestYaw = NormalizeAngle(yaw);
     }
-    if (player->IsInMidair())
-    {
-        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
-        if (distFromGround == 0.0f)
-            return false;
-    }
     loops++;
     if (ledgeDetected || loops > memoryDuration)
     {
         isOnLedge = ledgeDetected;
         loops = 0;
+    }
+    if (player->IsInMidair())
+    {
+        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
+        if (distFromGround == 0.0f)
+        {
+            ledgeDetected = false;
+            loops = memoryDuration;
+        }
     }
     return ledgeDetected;
 }

@@ -344,10 +344,11 @@ bool IsLedgeAhead()
     int i = 0; // increment into ray markers
     bool ledgeDetected = false;
     std::vector<float> validYaws;
-    bool consider;
+
+    // bool consider;
     for (float yaw : yawOffsets)
     {
-        consider = true;
+        // consider = true;
         RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
         float dirLength = dirVec.Length();
         if (dirLength == 0.0f)
@@ -360,13 +361,16 @@ bool IsLedgeAhead()
             float alignment = normalizedDir.Dot(moveDirection);
             if (alignment < directionThreshold)
             {
-                if (!physicalBlocker)
-                    continue;
-                consider = false;
+                // if (!physicalBlocker)
+                continue;
+                // consider = false;
             }
         }
         else
-            consider = false;
+        {
+            // consider = false;
+            continue;
+        }
 
         RE::NiPoint3 rayFrom = playerPos + (normalizedDir * ledgeDistance) + RE::NiPoint3(0, 0, 80);
         RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
@@ -387,22 +391,20 @@ bool IsLedgeAhead()
                 marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
                 i++;
             }
-            if (hitPos.z > playerPos.z - maxStepUpHeight)
+            if (hitPos.z > playerPos.z /* + maxStepUpHeight*/)
             {
-                // logger::trace("Hit surface is above playerPos.z — step height");
-                //  if (!physicalBlocker)
-                //     return false;
+                // logger::trace("Hit surface is above playerPos.z + step height");
                 continue;
             }
 
             float verticalDrop = playerPos.z - hitPos.z;
-            if (verticalDrop > dropThreshold && consider)
+            if (verticalDrop > dropThreshold /* && consider*/)
             {
                 ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
         }
-        else if (consider && physicalBlocker)
+        else if (/*consider &&*/ physicalBlocker)
         {
             ledgeDetected = true;
             validYaws.push_back(yaw);

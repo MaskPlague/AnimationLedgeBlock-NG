@@ -465,7 +465,6 @@ void StopPlayerVelocity()
     }
     else
     {
-        controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
         if (!movedBlocker)
         {
             logger::trace("Moving physcial blocker");
@@ -625,7 +624,6 @@ void OnPostLoadGame()
             CreateLedgeBlocker();
         RE::PlayerCharacter::GetSingleton()->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
         logger::info("Event Sink Created");
-        LoopEdgeCheck();
     }
     catch (...)
     {
@@ -656,8 +654,7 @@ extern "C" DLLEXPORT bool SKSEPlugin_Load(const SKSE::LoadInterface *skse)
     LoadConfig();
     SetLogLevel();
 
-    auto *messaging = SKSE::GetMessagingInterface();
-    messaging->RegisterListener("SKSE", MessageHandler);
+    SKSE::GetMessagingInterface()->RegisterListener("SKSE", MessageHandler);
 
     logger::info("Animation Ledge Block NG Plugin Loaded");
 

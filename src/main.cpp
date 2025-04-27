@@ -1,6 +1,7 @@
 namespace logger = SKSE::log;
 
-static bool debugMode = false;
+static bool showMarkers = false;
+static int logLevel = 2;
 static bool physicalBlocker = true;
 static float dropThreshold = 150.0f; // 1.5x 1.0 player height
 static float ledgeDistance = 50.0f;  // 50.0 units around the player
@@ -39,7 +40,30 @@ void SetupLog()
     spdlog::set_level(spdlog::level::trace);
     spdlog::flush_on(spdlog::level::trace);
 }
-
+void SetLogLevel()
+{
+    switch (logLevel)
+    {
+    case 0:
+        spdlog::set_level(spdlog::level::err);
+        break;
+    case 1:
+        spdlog::set_level(spdlog::level::warn);
+        break;
+    case 2:
+        spdlog::set_level(spdlog::level::info);
+        break;
+    case 3:
+        spdlog::set_level(spdlog::level::debug);
+        break;
+    case 4:
+        spdlog::set_level(spdlog::level::trace);
+        break;
+    default:
+        logLevel = 2;
+        spdlog::set_level(spdlog::level::info);
+    }
+}
 void LoadConfig()
 {
     CSimpleIniA ini;
@@ -68,7 +92,7 @@ void LoadConfig()
     if (memoryDuration < 1)
         memoryDuration = 1;
 
-    debugMode = ini.GetBoolValue("Debug", "Enable", false);
+    logLevel = ini.GetLongValue("Debug", "LoggingLevel", 2);
 
     // Optionally write defaults back for any missing keys:
     ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);
@@ -77,7 +101,7 @@ void LoadConfig()
     ini.SetDoubleValue("General", "LedgeDistance", static_cast<double>(ledgeDistance));
     ini.SetDoubleValue("General", "GroundLeeway", static_cast<double>(groundLeeway));
     ini.SetLongValue("General", "MemoryDuration", memoryDuration);
-    ini.SetBoolValue("Debug", "Enable", debugMode);
+    ini.SetLongValue("Debug", "LoggingLevel", logLevel);
     ini.SaveFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
 }
 
@@ -104,13 +128,13 @@ bool CreateLedgeBlocker()
     logger::trace("using blocker type {}", physicalBlockerType);
     if (!blocker)
     {
-        logger::info("Error, Could not access Animation Ledge Block NG.esp");
+        logger::warn("Could not access Animation Ledge Block NG.esp");
         return true;
     }
     auto *player = RE::PlayerCharacter::GetSingleton();
     if (!player)
     {
-        logger::info("Error, Could not access the player");
+        logger::warn("Could not access the player to create physical ledge blocker.");
         return true;
     }
     auto placed = player->PlaceObjectAtMe(blocker, true);
@@ -206,15 +230,24 @@ bool IsLedgeAhead()
 {
     const auto player = RE::PlayerCharacter::GetSingleton();
     if (!player || player->AsActorState()->IsSwimming() || player->AsActorState()->IsFlying())
+    {
+        logger::warn("Either could not get player or player is swimming or on dragon.");
         return false;
+    }
 
     const auto cell = player->GetParentCell();
     if (!cell)
+    {
+        logger::warn("Ledge check couldn't get parent cell");
         return false;
+    }
 
     const auto bhkWorld = cell->GetbhkWorld();
     if (!bhkWorld)
+    {
+        logger::warn("Ledge check couldn't get bhkWorld");
         return false;
+    }
 
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
     const float rayLength = 600.0f; // 600.0f
@@ -288,7 +321,7 @@ bool IsLedgeAhead()
             RE::NiPoint3 delta = rayTo - rayFrom;
             RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
 
-            if (debugMode) // if in debug mode move objects to ray hit positions
+            if (showMarkers) // if in debug mode move objects to ray hit positions
             {
                 auto marker = rayMarkers[i];
                 marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
@@ -356,24 +389,33 @@ void StopPlayerVelocity()
 {
     auto *player = RE::PlayerCharacter::GetSingleton();
     if (!player)
+    {
+        logger::error("Could not get player singleton");
         return;
+    }
     auto *controller = player->GetCharController();
-    if (!controller)
-        return;
 
+    if (!controller)
+    {
+        logger::error("Could not get player character controller");
+        return;
+    }
+
+    controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
     if (!physicalBlocker)
     {
-        controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
+        logger::trace("Teleportation blocking");
         auto pos = player->GetPosition();
         RE::NiPoint3 dirVec(std::sin(bestYaw), std::cos(bestYaw), 0.0f);
         auto backPos = pos - (dirVec * 4.0f);
         player->SetPosition(backPos, true);
     }
-    if (physicalBlocker)
+    else
     {
         controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
         if (!movedBlocker)
         {
+            logger::trace("Moving physcial blocker");
             auto playerPos = player->GetPosition();
             RE::NiPoint3 objDir(std::sin(bestYaw), std::cos(bestYaw), 0.0f);
             objDir.Unitize();
@@ -450,9 +492,10 @@ bool IsGameWindowFocused()
     static const HWND gameWindow = ::FindWindow(nullptr, L"Skyrim Special Edition");
     return ::GetForegroundWindow() == gameWindow;
 }
+
 void LoopEdgeCheck()
 {
-    logger::debug("Loop starting");
+    logger::debug("Edge Check Loop starting");
     std::thread([&]
                 {while (isAttacking || isOnLedge) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(11));
@@ -475,14 +518,14 @@ public:
         {
             return RE::BSEventNotifyControl::kStop;
         }
-        // logger::trace("Payload: {}", event->payload);
-        // logger::trace("Tag: {}\n", event->tag);
+        logger::trace("Payload: {}", event->payload);
+        logger::trace("Tag: {}", event->tag);
         static int type = 0;
         if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
             event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart")
         {
             isAttacking = true;
-            logger::debug("\nAnimation Started");
+            logger::debug("Animation Started");
             if (!isLooping)
                 LoopEdgeCheck();
             isLooping = true;
@@ -506,7 +549,7 @@ public:
             movedBlocker = false;
             if (physicalBlocker)
                 ledgeBlocker->SetPosition(ledgeBlocker->GetPositionX(), ledgeBlocker->GetPositionY(), -10000.0f);
-            logger::debug("\nAnimation Finished");
+            logger::debug("Animation Finished");
         }
 
         return RE::BSEventNotifyControl::kContinue;
@@ -523,7 +566,7 @@ void OnPostLoadGame()
     logger::info("Creating Event Sink");
     try
     {
-        if (debugMode)
+        if (showMarkers)
             InitializeRayMarkers();
         if (physicalBlocker)
             CreateLedgeBlocker();
@@ -533,7 +576,7 @@ void OnPostLoadGame()
     }
     catch (...)
     {
-        logger::warn("Failed to Create Event Sink");
+        logger::error("Failed to Create Event Sink");
     }
 }
 
@@ -541,8 +584,13 @@ void MessageHandler(SKSE::MessagingInterface::Message *msg)
 {
     if (msg->type != SKSE::MessagingInterface::kPostLoadGame)
         return;
+    logger::debug("Recieved PostLoadGame message");
     if (!bool(msg->data))
+    {
+        logger::debug("PostLoadGame: false");
         return;
+    }
+    logger::debug("PostLoadGame: true");
     OnPostLoadGame();
 }
 
@@ -553,10 +601,7 @@ extern "C" DLLEXPORT bool SKSEPlugin_Load(const SKSE::LoadInterface *skse)
     SetupLog();
     logger::info("Animation Ledge Block NG Plugin Starting");
     LoadConfig();
-    if (debugMode)
-        spdlog::set_level(spdlog::level::trace);
-    else
-        spdlog::set_level(spdlog::level::info);
+    SetLogLevel();
 
     auto *messaging = SKSE::GetMessagingInterface();
     messaging->RegisterListener("SKSE", MessageHandler);

@@ -229,6 +229,23 @@ float NormalizeAngle(float angle)
     return std::fmod((angle + 2 * RE::NI_PI), (2 * RE::NI_PI));
 }
 
+float MaxZDist(std::vector<RE::NiPoint3> &hits)
+{
+    if (hits.empty())
+        return 0.0f;
+
+    float max = hits[0].z;
+    float min = hits[0].z;
+    for (RE::NiPoint3 hit : hits)
+    {
+        if (hit.z > max)
+            max = hit.z;
+        else if (hit.z < min)
+            min = hit.z;
+    }
+    return max - min;
+}
+
 bool IsLedgeAhead()
 {
     const auto player = RE::PlayerCharacter::GetSingleton();
@@ -275,12 +292,51 @@ bool IsLedgeAhead()
     {
         moveDirection = currentLinearVelocity / velocityLength;
     }
-
     // Yaw offsets to use for rays around the player
     float playerYaw = player->GetAngleZ();
     std::vector<float> yawOffsets;
 
-    const float angleStep = static_cast<float>(2.0 * RE::NI_PI / static_cast<long double>(numRays));
+    if (player->IsInMidair())
+    {
+        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
+        // If over a certain distance from ground, create and cast far rays to get slope of terrain
+        if (distFromGround == 0.0f)
+        {
+            std::vector<RE::NiPoint3> hitPositions;
+            for (float yaw : yawOffsets)
+            {
+                RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
+                float dirLength = dirVec.Length();
+                if (dirLength == 0.0f)
+                    continue;
+                RE::NiPoint3 normalizedDir = dirVec / dirLength;
+                RE::NiPoint3 rayFrom = playerPos + (normalizedDir * 200.0f) + RE::NiPoint3(0, 0, 80);
+                RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
+
+                RE::bhkPickData ray;
+                ray.rayInput.from = rayFrom * havokWorldScale;
+                ray.rayInput.to = rayTo * havokWorldScale;
+                ray.rayInput.filterInfo = filterInfo;
+
+                if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
+                {
+                    RE::NiPoint3 delta = rayTo - rayFrom;
+                    RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
+                    if (hitPos.z > playerPos.z)
+                        continue;
+                    hitPositions.push_back(hitPos);
+                }
+            }
+            auto heightDiff = MaxZDist(hitPositions);
+            if (heightDiff < 300.0f)
+            {
+                logger::trace("HeightDiff of {} is less than 300.0f, returing false", heightDiff);
+                return false;
+            }
+        }
+    }
+
+    float angleStep = static_cast<float>(2.0 * RE::NI_PI / static_cast<long double>(numRays));
     for (int i = 0; i < numRays; ++i)
     {
         yawOffsets.push_back(playerYaw + i * angleStep);
@@ -362,15 +418,6 @@ bool IsLedgeAhead()
     {
         isOnLedge = ledgeDetected;
         loops = 0;
-    }
-    if (player->IsInMidair())
-    {
-        auto distFromGround = GetPlayerDistanceToGround(player, bhkWorld);
-        if (distFromGround == 0.0f)
-        {
-            ledgeDetected = false;
-            loops = memoryDuration;
-        }
     }
     return ledgeDetected;
 }

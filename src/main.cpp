@@ -118,10 +118,13 @@ bool CreateLedgeBlocker()
     {
     case 0: // Half Ring wall
         blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+        break;
     case 1: // Full Ring
         blocker = handler->LookupForm<RE::TESObjectSTAT>(0x801, "Animation Ledge Block NG.esp");
+        break;
     case 2: // Shallow wall
         blocker = handler->LookupForm<RE::TESObjectSTAT>(0x802, "Animation Ledge Block NG.esp");
+        break;
     default: // Default Half Ring wall
         blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
     }

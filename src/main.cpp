@@ -272,7 +272,7 @@ bool IsLedgeAhead()
     const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
     const float rayLength = 600.0f; // 600.0f
 
-    const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
+    // const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
     const float directionThreshold = 0.7f; // Adjust for tighter/looser direction matching
     bestDist = -1.0f;
 

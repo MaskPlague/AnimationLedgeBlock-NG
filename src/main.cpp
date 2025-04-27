@@ -24,7 +24,7 @@ static int untilMoveAgain = 0;
 static int untilMomentHide = 0;
 
 const int numRays = 12; // Number of rays to create.
-constexpr int kRayMarkerCount = numRays;
+constexpr int kRayMarkerCount = (numRays / 2) + numRays;
 static std::vector<RE::TESObjectREFR *> rayMarkers;
 
 void SetupLog()
@@ -264,6 +264,12 @@ bool IsLedgeAhead()
     player->GetLinearVelocity(currentLinearVelocity);
     currentLinearVelocity.z = 0.0f; // z is not important
     float velocityLength = currentLinearVelocity.Length();
+
+    // Filter out player collision from rays
+    uint32_t collisionFilterInfo = 0;
+    player->GetCollisionFilterInfo(collisionFilterInfo);
+    uint32_t filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
+
     RE::NiPoint3 moveDirection = {0.0f, 0.0f, 0.0f};
     if (velocityLength > 0.0f)
     {
@@ -312,12 +318,7 @@ bool IsLedgeAhead()
         RE::bhkPickData ray;
         ray.rayInput.from = rayFrom * havokWorldScale;
         ray.rayInput.to = rayTo * havokWorldScale;
-
-        // Don't collide with player, from SkyParkourV2
-        uint32_t collisionFilterInfo = 0;
-        player->GetCollisionFilterInfo(collisionFilterInfo);
-        ray.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
-        //---------------------------------------------
+        ray.rayInput.filterInfo = filterInfo;
 
         if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
         {

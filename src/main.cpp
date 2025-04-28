@@ -574,7 +574,8 @@ public:
         logger::trace("Tag: {}", event->tag);
         static int type = 0;
         if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
-            event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart")
+            event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart" ||
+            event->tag == "MCO_DisableSecondDodge")
         {
             isAttacking = true;
             logger::debug("Animation Started");
@@ -591,9 +592,12 @@ public:
                 type = 3;
             else if (event->tag == "TKDR_DodgeStart")
                 type = 4;
+            else if (event->tag == "MCO_DisableSecondDodge")
+                type = 5;
         }
         else if (isAttacking && ((type == 1 && event->tag == "attackStop") || (type == 2 && event->payload == "$DMCO_Reset") ||
-                                 (type == 3 && event->tag == "RollStop") || (type == 4 && event->tag == "TKDR_DodgeEnd")))
+                                 (type == 3 && event->tag == "RollStop") || (type == 4 && event->tag == "TKDR_DodgeEnd") ||
+                                 (type == 5 && event->tag == "EnableBumper")))
         {
             type = 0;
             isAttacking = false;

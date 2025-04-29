@@ -407,7 +407,8 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
             if (showMarkers) // if in debug mode move objects to ray hit positions
             {
                 auto marker = state.rayMarkers[i];
-                marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
+                if (marker)
+                    marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
                 i++;
             }
             if (hitPos.z > actorPos.z - 50.0f)
@@ -701,10 +702,10 @@ public:
                         it->second.ledgeBlocker->GetPositionY(),
                         -10000.0f);
                 }
+                g_actorStates.erase(it);
+                actor->RemoveAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
+                logger::debug("Stopped tracking actor: {}", actor->GetName());
             }
-            g_actorStates.erase(it);
-            actor->RemoveAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
-            logger::debug("Stopped tracking actor: {}", actor->GetName());
         }
 
         return RE::BSEventNotifyControl::kContinue;
@@ -721,6 +722,7 @@ void OnPostLoadGame()
     logger::info("Creating Event Sink(s)");
     try
     {
+        g_actorStates.clear();
         auto player = RE::PlayerCharacter::GetSingleton();
         player->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
         auto &state = g_actorStates[player->GetFormID()];

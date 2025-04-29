@@ -43,18 +43,6 @@ ActorState &GetState(RE::Actor *actor)
     return g_actorStates[actor->GetFormID()];
 }
 
-void CleanupDeadActors()
-{
-    for (auto it = g_actorStates.begin(); it != g_actorStates.end();)
-    {
-        auto actor = RE::TESForm::LookupByID<RE::Actor>(it->first);
-        if (!actor || actor->IsDead() || actor->IsDeleted() || !actor->IsInCombat())
-            it = g_actorStates.erase(it);
-        else
-            ++it;
-    }
-}
-
 void SetupLog()
 {
     auto logsFolder = SKSE::log::log_directory();

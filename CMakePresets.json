@@ -40,6 +40,16 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "relWithDebInfo",
+            "inherits": [
+                "base"
+            ],
+            "displayName": "RelWithDebInfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
         }
     ]
 }

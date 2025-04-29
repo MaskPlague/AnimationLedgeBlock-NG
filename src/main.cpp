@@ -128,14 +128,15 @@ void LoadConfig()
         memoryDuration = 1;
 
     logLevel = ini.GetLongValue("Debug", "LoggingLevel", 2);
-    logger::debug("Version               {}", SKSE::PluginDeclaration::GetSingleton()->GetVersion());
-    logger::debug("PhyscialBlocker:      {}", physicalBlocker);
-    logger::debug("PhyscialBlockerType:  {}", physicalBlockerType);
-    logger::debug("DropThreshold:        {:.2f}", dropThreshold);
-    logger::debug("LedgeDistance:        {:.2f}", ledgeDistance);
-    logger::debug("GroundLeeway          {:.2f}", groundLeeway);
-    logger::debug("MemoryDuration:       {}", memoryDuration);
-    logger::debug("LoggingLevel:         {}", logLevel);
+    logger::debug("Version              {}", SKSE::PluginDeclaration::GetSingleton()->GetVersion());
+    logger::debug("PhyscialBlocker:     {}", physicalBlocker);
+    logger::debug("PhyscialBlockerType: {}", physicalBlockerType);
+    logger::debug("DropThreshold:       {:.2f}", dropThreshold);
+    logger::debug("LedgeDistance:       {:.2f}", ledgeDistance);
+    logger::debug("GroundLeeway         {:.2f}", groundLeeway);
+    logger::debug("MemoryDuration:      {}", memoryDuration);
+    logger::debug("EnableNPCs:          {}", enableForNPCs);
+    logger::debug("LoggingLevel:        {}", logLevel);
 
     // Optionally write defaults back for any missing keys:
     ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);

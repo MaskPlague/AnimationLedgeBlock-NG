@@ -43,6 +43,25 @@ ActorState &GetState(RE::Actor *actor)
     return g_actorStates[actor->GetFormID()];
 }
 
+void CleanupActors()
+{
+    for (auto it = g_actorStates.begin(); it != g_actorStates.end();)
+    {
+        auto actor = RE::TESForm::LookupByID<RE::Actor>(it->first);
+        if (!actor || actor->IsDead() || actor->IsDeleted() || !actor->IsInCombat() || actor->IsDisabled())
+        {
+            if (actor->IsPlayerRef())
+            {
+                ++it;
+                continue;
+            }
+            it = g_actorStates.erase(it);
+        }
+        else
+            ++it;
+    }
+}
+
 void SetupLog()
 {
     auto logsFolder = SKSE::log::log_directory();
@@ -418,7 +437,7 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
                 auto marker = state.rayMarkers[i];
                 if (marker)
                     marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
-                i++;
+                ++i;
             }
             if (hitPos.z > actorPos.z - 50.0f)
             {
@@ -447,7 +466,7 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
         float yaw = AverageAngles(validYaws);
         state.bestYaw = NormalizeAngle(yaw);
     }
-    state.loops++;
+    ++state.loops;
     if (ledgeDetected || state.loops > memoryDuration)
     {
         state.isOnLedge = ledgeDetected;
@@ -549,17 +568,17 @@ void EdgeCheck(RE::Actor *actor)
     {
         if (IsLedgeAhead(actor, state) && state.isAttacking)
         {
-            state.untilMoveAgain++;
+            ++state.untilMoveAgain;
             StopActorVelocity(actor, state);
         }
         else if (state.isAttacking)
-            state.untilMoveAgain++;
+            ++state.untilMoveAgain;
 
         if (state.untilMoveAgain > 50)
         {
             state.untilMoveAgain = 0;
             state.movedBlocker = false;
-            state.untilMomentHide++;
+            ++state.untilMomentHide;
         }
         if (state.untilMomentHide > 3)
         {
@@ -729,7 +748,7 @@ public:
                 logger::debug("Stopped tracking actor: {}", actor->GetName());
             }
         }
-
+        CleanupActors();
         return RE::BSEventNotifyControl::kContinue;
     }
     static CombatEventSink *GetSingleton()

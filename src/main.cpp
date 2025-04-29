@@ -59,6 +59,10 @@ void SetLogLevel()
     case 4:
         spdlog::set_level(spdlog::level::trace);
         break;
+    case 10:
+        spdlog::set_level(spdlog::level::trace);
+        showMarkers = true;
+        break;
     default:
         logLevel = 2;
         spdlog::set_level(spdlog::level::info);

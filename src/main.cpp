@@ -369,12 +369,17 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
     int i = 0; // increment into ray markers
     bool ledgeDetected = false;
     std::vector<float> validYaws;
+    // int continued = 0;
     for (float yaw : yawOffsets)
     {
         RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
         float dirLength = dirVec.Length();
         if (dirLength == 0.0f)
+        {
+            // continued++;
+            // logger::trace(" Skipping ray as dirLength is 0.0f, {}.", continued);
             continue;
+        }
         RE::NiPoint3 normalizedDir = dirVec / dirLength;
 
         // Skip if we're moving and this direction doesn't match our movement
@@ -383,11 +388,15 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
             float alignment = normalizedDir.Dot(moveDirection);
             if (alignment < directionThreshold)
             {
+                // continued++;
+                // logger::trace(" Skipping ray as it is not in correct direction, {}.", continued);
                 continue;
             }
         }
         else
         {
+            // continued++;
+            // logger::trace(" Skipping ray as the velocity is not above 0.0f, {}", continued);
             continue;
         }
 
@@ -413,19 +422,22 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
             }
             if (hitPos.z > actorPos.z - 50.0f)
             {
-                // logger::trace("Hit surface is above actorPos.z + step height");
+                // logger::trace("Hit surface is above actorPos.z - 50.0f");
+                // continued++;
                 continue;
             }
 
             float verticalDrop = actorPos.z - hitPos.z;
             if (verticalDrop > dropThreshold)
             {
+                // logger::trace("Hit below drop threshold, cliff detected");
                 ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
         }
         else if (physicalBlocker)
         {
+            // logger::trace("Ray missed, must be cliff.");
             ledgeDetected = true;
             validYaws.push_back(yaw);
         }
@@ -441,6 +453,8 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
         state.isOnLedge = ledgeDetected;
         state.loops = 0;
     }
+    // if (continued == numRays)
+    //     logger::trace(" All rays skipped");
     return ledgeDetected;
 }
 
@@ -524,8 +538,10 @@ void EdgeCheck(RE::Actor *actor)
     auto &state = GetState(actor);
     if (!physicalBlocker)
     {
+        // logger::trace("Checking for ledge.");
         if (IsLedgeAhead(actor, state) && state.isAttacking || state.isOnLedge)
         {
+            // logger::trace("Stopping actor velocity.");
             StopActorVelocity(actor, state);
         }
     }
@@ -564,7 +580,7 @@ void LoopEdgeCheck(RE::Actor *actor)
 {
     if (!actor)
         return;
-
+    logger::trace("Starting Edge check loop");
     std::thread([actor]()
                 {
         RE::FormID formID = actor->GetFormID();
@@ -575,11 +591,12 @@ void LoopEdgeCheck(RE::Actor *actor)
             if (!IsGameWindowFocused())
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                //logger::trace("Window is tabbed out, stalling loop");
                 continue;
             }
             auto it = g_actorStates.find(formID);
             if (it == g_actorStates.end()) {
-                logger::debug("Actor state no longer exists, ending LoopEdgeCheck");
+                //logger::debug("Actor state no longer exists, ending LoopEdgeCheck");
                 break;
             }
 
@@ -668,13 +685,18 @@ public:
         const RE::TESCombatEvent *a_event,
         RE::BSTEventSource<RE::TESCombatEvent> *) override
     {
-        if (!a_event)
+        if (!a_event || !a_event->actor)
         {
             return RE::BSEventNotifyControl::kContinue;
         }
         auto actor = a_event->actor->As<RE::Actor>();
-        if (!actor || actor->IsPlayerRef())
+        if (!actor || actor->IsPlayerRef() || !actor->GetActorBase() || !actor->GetActorBase()->GetRace())
             return RE::BSEventNotifyControl::kContinue;
+        auto race = actor->GetActorBase()->GetRace();
+        if (!race->HasKeywordString("ActorTypeNPC"))
+        {
+            return RE::BSEventNotifyControl::kContinue;
+        }
         auto formID = actor->GetFormID();
         auto combatState = a_event->newState;
         if (combatState == RE::ACTOR_COMBAT_STATE::kCombat)

@@ -51,25 +51,6 @@ ActorState *TryGetState(RE::Actor *actor)
     return it != g_actorStates.end() ? &it->second : nullptr;
 }
 
-void CleanupActors()
-{
-    for (auto it = g_actorStates.begin(); it != g_actorStates.end();)
-    {
-        auto actor = RE::TESForm::LookupByID<RE::Actor>(it->first);
-        if (!actor || actor->IsDead() || actor->IsDeleted() || !actor->IsInCombat() || actor->IsDisabled())
-        {
-            if (actor->IsPlayerRef())
-            {
-                ++it;
-                continue;
-            }
-            it = g_actorStates.erase(it);
-        }
-        else
-            ++it;
-    }
-}
-
 void SetupLog()
 {
     auto logsFolder = SKSE::log::log_directory();
@@ -680,6 +661,10 @@ void LoopEdgeCheck(RE::Actor *actor)
                 //logger::debug("Actor state no longer exists, ending LoopEdgeCheck");
                 break;
             }
+            
+            auto actorPtr = RE::TESForm::LookupByID<RE::Actor>(formID);
+            if (!actorPtr)
+                break;
 
             auto& state = it->second;
             if (!(state.isAttacking || state.isOnLedge)) {
@@ -762,6 +747,26 @@ public:
     }
 };
 
+void CleanupActors()
+{
+    for (auto it = g_actorStates.begin(); it != g_actorStates.end();)
+    {
+        auto actor = RE::TESForm::LookupByID<RE::Actor>(it->first);
+        if (!actor || actor->IsDead() || actor->IsDeleted() || !actor->IsInCombat() || actor->IsDisabled())
+        {
+            if (actor->IsPlayerRef())
+            {
+                ++it;
+                continue;
+            }
+            actor->RemoveAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
+            it = g_actorStates.erase(it);
+        }
+        else
+            ++it;
+    }
+}
+
 class CombatEventSink : public RE::BSTEventSink<RE::TESCombatEvent>
 {
 public:
@@ -783,7 +788,7 @@ public:
         }
         auto formID = actor->GetFormID();
         auto combatState = a_event->newState;
-        if (combatState == RE::ACTOR_COMBAT_STATE::kCombat)
+        if (combatState == RE::ACTOR_COMBAT_STATE::kCombat && !g_actorStates.contains(formID))
         {
             auto &state = g_actorStates[formID];
             if (!state.ledgeBlocker && physicalBlocker)
@@ -795,7 +800,7 @@ public:
             actor->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
             logger::debug("Tracking new combat actor: {}", actor->GetName());
         }
-        else if (combatState == RE::ACTOR_COMBAT_STATE::kNone)
+        else if (combatState == RE::ACTOR_COMBAT_STATE::kNone && g_actorStates.contains(formID))
         {
             auto it = g_actorStates.find(formID);
             if (it != g_actorStates.end())

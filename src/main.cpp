@@ -245,7 +245,9 @@ float GetActorDistanceToGround(RE::Actor *actor, RE::bhkWorld *const world)
             if (hitObject && (hitObject->Is(RE::FormType::Flora) || hitObject->Is(RE::FormType::Tree)))
             {
                 auto hitRefPos = hitRef->GetPosition();
-                if (hitRefPos.z < hitPos.z)
+                if (hitRefPos.z < hitPos.z && hitRefPos.z < rayTo.z)
+                    return 0.0f;
+                else if (hitRefPos.z < hitPos.z)
                     hitPos = hitRefPos;
             }
         }

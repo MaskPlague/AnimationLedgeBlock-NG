@@ -238,7 +238,7 @@ void InitializeRayMarkers(RE::Actor *actor)
     }
 }
 
-float GetActorDistanceToGround(auto actor, auto world)
+float GetActorDistanceToGround(RE::Actor *actor, RE::bhkWorld *const world)
 {
     RE::NiPoint3 actorPos = actor->GetPosition();
     RE::NiPoint3 rayFrom = {actorPos.x, actorPos.y, actorPos.z + 80.0f};
@@ -252,8 +252,22 @@ float GetActorDistanceToGround(auto actor, auto world)
     pickData.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
     if (world->PickObject(pickData) && pickData.rayOutput.HasHit())
     {
+        auto hitOwner = pickData.rayOutput.rootCollidable->GetOwner<RE::hkpRigidBody>();
         RE::NiPoint3 delta = rayTo - rayFrom;
         RE::NiPoint3 hitPos = rayFrom + delta * pickData.rayOutput.hitFraction;
+        if (hitOwner)
+        {
+            auto *userData = hitOwner->GetUserData();
+            auto *hitRef = userData ? userData->As<RE::TESObjectREFR>() : nullptr;
+            auto *hitObject = hitRef ? hitRef->GetBaseObject() : nullptr;
+
+            if (hitObject && (hitObject->Is(RE::FormType::Flora) || hitObject->Is(RE::FormType::Tree)))
+            {
+                auto hitRefPos = hitRef->GetPosition();
+                if (hitRefPos.z < hitPos.z)
+                    hitPos = hitRefPos;
+            }
+        }
         return actorPos.z - hitPos.z;
     }
 
@@ -376,11 +390,25 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
                 ray.rayInput.from = rayFrom * havokWorldScale;
                 ray.rayInput.to = rayTo * havokWorldScale;
                 ray.rayInput.filterInfo = filterInfo;
-
                 if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
                 {
+                    auto hitOwner = ray.rayOutput.rootCollidable->GetOwner<RE::hkpRigidBody>();
                     RE::NiPoint3 delta = rayTo - rayFrom;
                     RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
+                    if (hitOwner)
+                    {
+                        auto *userData = hitOwner->GetUserData();
+                        auto *hitRef = userData ? userData->As<RE::TESObjectREFR>() : nullptr;
+                        auto *hitObject = hitRef ? hitRef->GetBaseObject() : nullptr;
+
+                        if (hitObject && (hitObject->Is(RE::FormType::Flora) || hitObject->Is(RE::FormType::Tree)))
+                        {
+                            auto hitRefPos = hitRef->GetPosition();
+                            if (hitRefPos.z < hitPos.z)
+                                hitPos = hitRefPos;
+                        }
+                    }
+
                     if (hitPos.z > actorPos.z + 40.0F)
                         continue;
                     hitPositions.push_back(hitPos);
@@ -440,8 +468,22 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
 
         if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
         {
+            auto hitOwner = ray.rayOutput.rootCollidable->GetOwner<RE::hkpRigidBody>();
             RE::NiPoint3 delta = rayTo - rayFrom;
             RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
+            if (hitOwner)
+            {
+                auto *userData = hitOwner->GetUserData();
+                auto *hitRef = userData ? userData->As<RE::TESObjectREFR>() : nullptr;
+                auto *hitObject = hitRef ? hitRef->GetBaseObject() : nullptr;
+
+                if (hitObject && (hitObject->Is(RE::FormType::Flora) || hitObject->Is(RE::FormType::Tree)))
+                {
+                    auto hitRefPos = hitRef->GetPosition();
+                    if (hitRefPos.z < hitPos.z)
+                        hitPos = hitRefPos;
+                }
+            }
 
             if (showMarkers) // if in debug mode move objects to ray hit positions
             {

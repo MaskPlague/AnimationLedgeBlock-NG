@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 # Set your project name. This will be the name of your SKSE .dll file.
-project(AnimationLedgeBlockNG VERSION 0.2.2 LANGUAGES CXX)
+project(AnimationLedgeBlockNG VERSION 0.2.3 LANGUAGES CXX)
 
 #
 # YOU DO NOT NEED TO EDIT ANYTHING BELOW HERE
@@ -33,7 +33,6 @@ endif()
 # set(OUTPUT_FOLDER "C:/path/to/any/folder")
 
 add_compile_definitions(-D_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
-
 # Setup your SKSE plugin as an SKSE plugin!
 find_package(CommonLibSSE CONFIG REQUIRED)
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES src/main.cpp)

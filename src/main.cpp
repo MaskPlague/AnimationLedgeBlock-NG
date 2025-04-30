@@ -43,6 +43,14 @@ ActorState &GetState(RE::Actor *actor)
     return g_actorStates[actor->GetFormID()];
 }
 
+ActorState *TryGetState(RE::Actor *actor)
+{
+    if (!actor)
+        return nullptr;
+    auto it = g_actorStates.find(actor->GetFormID());
+    return it != g_actorStates.end() ? &it->second : nullptr;
+}
+
 void CleanupActors()
 {
     for (auto it = g_actorStates.begin(); it != g_actorStates.end();)
@@ -294,6 +302,9 @@ float MaxZDist(std::vector<RE::NiPoint3> &hits)
 
 bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
 {
+    ActorState *stateCheck = TryGetState(actor);
+    if (!stateCheck)
+        return false;
     if (!actor || actor->AsActorState()->IsSwimming() || actor->AsActorState()->IsFlying())
     {
         logger::warn("Either could not get actor or actor is swimming or on dragon.");
@@ -493,6 +504,9 @@ void SetAngle(RE::TESObjectREFR *ref, const RE::NiPoint3 &a_position)
 // Force the actor to stop moving toward their original vector
 void StopActorVelocity(RE::Actor *actor, ActorState &state)
 {
+    ActorState *stateCheck = TryGetState(actor);
+    if (!stateCheck)
+        return;
     auto *controller = actor->GetCharController();
     if (!controller)
     {
@@ -527,6 +541,9 @@ void StopActorVelocity(RE::Actor *actor, ActorState &state)
 }
 void CellChangeCheck(RE::Actor *actor)
 {
+    ActorState *stateCheck = TryGetState(actor);
+    if (!stateCheck)
+        return;
     auto &state = GetState(actor);
     if (!physicalBlocker)
         return;
@@ -554,6 +571,9 @@ void CellChangeCheck(RE::Actor *actor)
 
 void EdgeCheck(RE::Actor *actor)
 {
+    ActorState *stateCheck = TryGetState(actor);
+    if (!stateCheck)
+        return;
     auto &state = GetState(actor);
     if (!physicalBlocker)
     {
@@ -649,6 +669,9 @@ public:
             return RE::BSEventNotifyControl::kContinue;
         }
         auto holderName = event->holder->GetName();
+        ActorState *stateCheck = TryGetState(actor);
+        if (!stateCheck)
+            return RE::BSEventNotifyControl::kContinue;
         auto &state = GetState(actor);
         logger::trace("{} Payload: {}", holderName, event->payload);
         logger::trace("{} Tag: {}", holderName, event->tag);

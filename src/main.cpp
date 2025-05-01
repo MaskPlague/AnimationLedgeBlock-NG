@@ -412,6 +412,8 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
             auto heightDiff = MaxZDist(hitPositions);
             if ((0.01f < heightDiff) && (heightDiff < 300.0f))
             {
+                // logger::trace("HeightDiff of {} is less than 300.0f, returing false", heightDiff);
+                state.isOnLedge = false;
                 return false;
             }
         }

@@ -29,6 +29,8 @@ struct ActorState
     int untilMoveAgain = 0;
     int untilMomentHide = 0;
 
+    int afterAttackTimer = 0;
+
     int animationType = 0;
 
     RE::TESObjectCELL *lastActorCell;
@@ -583,17 +585,9 @@ void CellChangeCheck(RE::Actor *actor)
     if (!stateCheck)
         return;
     auto &state = GetState(actor);
-    if (!physicalBlocker)
+    if (!physicalBlocker || !actor || !state.ledgeBlocker || !state.ledgeBlocker->GetParentCell())
         return;
 
-    if (!actor)
-        return;
-
-    if (!state.ledgeBlocker)
-        return;
-
-    if (!state.ledgeBlocker->GetParentCell())
-        return;
     auto *currentCell = actor->GetParentCell();
 
     if (currentCell != state.lastActorCell)
@@ -663,8 +657,8 @@ void LoopEdgeCheck(RE::Actor *actor)
     std::thread([actor]()
                 {
         RE::FormID formID = actor->GetFormID();
-
-        while (true) {
+        bool run = true;
+        while (run) {
             std::this_thread::sleep_for(std::chrono::milliseconds(11));
             if (!IsGameWindowFocused())
             {
@@ -675,22 +669,35 @@ void LoopEdgeCheck(RE::Actor *actor)
             auto it = g_actorStates.find(formID);
             if (it == g_actorStates.end()) {
                 //logger::trace("Actor state no longer exists, ending LoopEdgeCheck");
+                run = false;
                 break;
             }
             
             auto actorPtr = RE::TESForm::LookupByID<RE::Actor>(formID);
-            if (!actorPtr)
+            if (!actorPtr){
+                run = false;
                 break;
+            }
 
             auto& state = it->second;
             if (state.isAttacking || state.isOnLedge) {
+                if (!state.isAttacking && state.isOnLedge)
+                    ++state.afterAttackTimer;
+                if (!state.isAttacking && state.isOnLedge && state.afterAttackTimer > 25)
+                {
+                    state.afterAttackTimer = 0;
+                    run = false;
+                    break;
+                }
                 SKSE::GetTaskInterface()->AddTask([actor]() {
                     EdgeCheck(actor);
                     CellChangeCheck(actor);
                 });
             }
-            else
+            else{
+                run = false;
                 break;
+            }
         } })
         .detach();
 }
@@ -729,6 +736,7 @@ public:
             state.isLooping = true;
             state.untilMoveAgain = 0;
             state.untilMomentHide = 0;
+            state.afterAttackTimer = 0;
             if (event->tag == "PowerAttack_Start_end")
                 state.animationType = 1;
             else if (event->tag == "MCO_DodgeInitiate")
@@ -862,6 +870,8 @@ void OnPostLoadGame()
             player->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
             state.hasEventSink = true;
         }
+        else
+            logger::info("Player already has Event Sink");
         if (!state.ledgeBlocker && physicalBlocker)
         {
             CreateLedgeBlocker(player);

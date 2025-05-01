@@ -154,7 +154,7 @@ bool CreateLedgeBlocker(RE::Actor *actor)
     auto *handler = RE::TESDataHandler::GetSingleton();
     if (!handler || !actor)
     {
-        logger::info("Error, could not get TESDataHandler");
+        logger::warn("Error, could not get TESDataHandler");
         return true;
     }
     RE::TESObjectSTAT *blocker;
@@ -304,7 +304,11 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
 {
     ActorState *stateCheck = TryGetState(actor);
     if (!stateCheck)
+    {
+        logger::debug("Actor state no longer exists, cancel ledge check.");
         return false;
+    }
+
     if (!actor || actor->AsActorState()->IsSwimming() || actor->AsActorState()->IsFlying())
     {
         logger::warn("Either could not get actor or actor is swimming or on dragon.");
@@ -347,7 +351,6 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
     uint32_t collisionFilterInfo = 0;
     actor->GetCollisionFilterInfo(collisionFilterInfo);
     uint32_t filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
-
     RE::NiPoint3 moveDirection = {0.0f, 0.0f, 0.0f};
     if (velocityLength > 0.0f)
     {
@@ -405,13 +408,10 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
                         continue;
                     hitPositions.push_back(hitPos);
                 }
-                // else
-                //     hitPositions.push_back(RE::NiPoint3{0.0f, 0.0f, actorPos.z - 600.0f});
             }
             auto heightDiff = MaxZDist(hitPositions);
             if ((0.01f < heightDiff) && (heightDiff < 300.0f))
             {
-                logger::trace("HeightDiff of {} is less than 300.0f, returing false", heightDiff);
                 return false;
             }
         }
@@ -494,7 +494,7 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
             float verticalDrop = actorPos.z - hitPos.z;
             if (verticalDrop > dropThreshold)
             {
-                // logger::trace("Hit below drop threshold, cliff detected");
+                // logger::trace("Hit below drop threshold at {:.2f}, cliff detected", verticalDrop);
                 ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
@@ -539,12 +539,12 @@ void SetAngle(RE::TESObjectREFR *ref, const RE::NiPoint3 &a_position)
 void StopActorVelocity(RE::Actor *actor, ActorState &state)
 {
     ActorState *stateCheck = TryGetState(actor);
-    if (!stateCheck)
+    if (!stateCheck || !actor)
         return;
     auto *controller = actor->GetCharController();
     if (!controller)
     {
-        logger::error("Could not get actor character controller");
+        logger::warn("Could not get actor character controller");
         return;
     }
 
@@ -612,7 +612,7 @@ void EdgeCheck(RE::Actor *actor)
     if (!physicalBlocker)
     {
         // logger::trace("Checking for ledge.");
-        if (IsLedgeAhead(actor, state) && state.isAttacking || state.isOnLedge)
+        if (IsLedgeAhead(actor, state) && (state.isAttacking || state.isOnLedge))
         {
             // logger::trace("Stopping actor velocity.");
             StopActorVelocity(actor, state);

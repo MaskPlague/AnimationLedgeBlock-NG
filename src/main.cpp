@@ -689,6 +689,8 @@ void LoopEdgeCheck(RE::Actor *actor)
                     CellChangeCheck(actor);
                 });
             }
+            else
+                break;
         } })
         .detach();
 }

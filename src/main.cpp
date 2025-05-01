@@ -310,6 +310,12 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
         logger::warn("Either could not get actor or actor is swimming or on dragon.");
         return false;
     }
+    auto charController = actor->GetCharController();
+    if (charController && disableOnStairs && charController->flags.any(RE::CHARACTER_FLAGS::kOnStairs))
+    {
+        logger::trace("Character on stairs and stairs disables ledge check.");
+        return false;
+    }
 
     const auto cell = actor->GetParentCell();
     if (!cell)

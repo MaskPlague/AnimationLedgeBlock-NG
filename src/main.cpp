@@ -21,6 +21,7 @@ struct ActorState
     int loops = 0;
     bool isLooping = false;
     bool movedBlocker = false;
+    bool hasEventSink = false;
 
     float bestYaw = 0.0f;
     float bestDist = -1.0f;
@@ -839,8 +840,15 @@ void OnPostLoadGame()
     {
         g_actorStates.clear();
         auto player = RE::PlayerCharacter::GetSingleton();
-        player->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
+        RE::BSAnimationGraphManagerPtr manager;
+        player->RemoveAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
         auto &state = g_actorStates[player->GetFormID()];
+        if (!state.hasEventSink)
+        {
+            logger::info("Creating Player Event Sink");
+            player->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
+            state.hasEventSink = true;
+        }
         if (!state.ledgeBlocker && physicalBlocker)
         {
             CreateLedgeBlocker(player);

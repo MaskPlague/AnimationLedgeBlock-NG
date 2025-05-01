@@ -413,7 +413,9 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
             if ((0.01f < heightDiff) && (heightDiff < 300.0f))
             {
                 // logger::trace("HeightDiff of {} is less than 300.0f, returing false", heightDiff);
-                state.isOnLedge = false;
+                ++state.loops;
+                if (state.loops > memoryDuration)
+                    state.isOnLedge = false;
                 return false;
             }
         }

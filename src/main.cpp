@@ -4,6 +4,7 @@ static bool showMarkers = false;
 static int logLevel = 2;
 static bool physicalBlocker = true;
 static bool enableForNPCs = true;
+static bool disableOnStairs = true;
 static float dropThreshold = 150.0f; // 1.5x 1.0 player height
 static float ledgeDistance = 50.0f;  // 50.0 units around the player
 static float groundLeeway = 60.0f;
@@ -116,9 +117,8 @@ void LoadConfig()
     else if (!physicalBlocker && ledgeDistance < 10.0f)
         ledgeDistance = 10.0f;
     groundLeeway = static_cast<float>(ini.GetDoubleValue("General", "GroundLeeway", 60.0f));
-
+    disableOnStairs = ini.GetBoolValue("General", "DisableOnStairs", true);
     enableForNPCs = ini.GetBoolValue("General", "EnableNPCs", true);
-
     memoryDuration = ini.GetLongValue("General", "MemoryDuration", 10);
     if (memoryDuration < 1)
         memoryDuration = 1;
@@ -130,6 +130,7 @@ void LoadConfig()
     logger::debug("DropThreshold:       {:.2f}", dropThreshold);
     logger::debug("LedgeDistance:       {:.2f}", ledgeDistance);
     logger::debug("GroundLeeway         {:.2f}", groundLeeway);
+    logger::debug("DisableOnStairs      {}", disableOnStairs);
     logger::debug("MemoryDuration:      {}", memoryDuration);
     logger::debug("EnableNPCs:          {}", enableForNPCs);
     logger::debug("LoggingLevel:        {}", logLevel);
@@ -140,6 +141,7 @@ void LoadConfig()
     ini.SetDoubleValue("General", "DropThreshold", static_cast<double>(dropThreshold));
     ini.SetDoubleValue("General", "LedgeDistance", static_cast<double>(ledgeDistance));
     ini.SetDoubleValue("General", "GroundLeeway", static_cast<double>(groundLeeway));
+    ini.SetBoolValue("General", "DisableOnStairs", disableOnStairs);
     ini.SetLongValue("General", "MemoryDuration", memoryDuration);
     ini.SetBoolValue("General", "EnableNPCs", enableForNPCs);
     ini.SetLongValue("Debug", "LoggingLevel", logLevel);

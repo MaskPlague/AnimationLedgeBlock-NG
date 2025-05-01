@@ -639,8 +639,10 @@ void EdgeCheck(RE::Actor *actor)
 
 bool IsGameWindowFocused()
 {
-    static const HWND gameWindow = ::FindWindow(nullptr, L"Skyrim Special Edition");
-    return ::GetForegroundWindow() == gameWindow;
+    HWND foreground = ::GetForegroundWindow();
+    DWORD foregroundPID = 0;
+    ::GetWindowThreadProcessId(foreground, &foregroundPID);
+    return foregroundPID == ::GetCurrentProcessId();
 }
 
 void LoopEdgeCheck(RE::Actor *actor)
@@ -654,7 +656,6 @@ void LoopEdgeCheck(RE::Actor *actor)
 
         while (true) {
             std::this_thread::sleep_for(std::chrono::milliseconds(11));
-            
             if (!IsGameWindowFocused())
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -663,7 +664,7 @@ void LoopEdgeCheck(RE::Actor *actor)
             }
             auto it = g_actorStates.find(formID);
             if (it == g_actorStates.end()) {
-                //logger::debug("Actor state no longer exists, ending LoopEdgeCheck");
+                //logger::trace("Actor state no longer exists, ending LoopEdgeCheck");
                 break;
             }
             

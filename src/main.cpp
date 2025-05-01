@@ -672,14 +672,12 @@ void LoopEdgeCheck(RE::Actor *actor)
                 break;
 
             auto& state = it->second;
-            if (!(state.isAttacking || state.isOnLedge)) {
-                break;
+            if (state.isAttacking || state.isOnLedge) {
+                SKSE::GetTaskInterface()->AddTask([actor]() {
+                    EdgeCheck(actor);
+                    CellChangeCheck(actor);
+                });
             }
-
-            SKSE::GetTaskInterface()->AddTask([actor]() {
-                EdgeCheck(actor);
-                CellChangeCheck(actor);
-            });
         } })
         .detach();
 }
@@ -731,8 +729,10 @@ public:
         }
         else if (state.isAttacking && ((state.animationType == 1 && event->tag == "attackStop") || (state.animationType == 2 && event->payload == "$DMCO_Reset") ||
                                        (state.animationType == 3 && event->tag == "RollStop") || (state.animationType == 4 && event->tag == "TKDR_DodgeEnd") ||
-                                       (state.animationType == 5 && event->tag == "EnableBumper")))
+                                       (state.animationType == 5 && event->tag == "EnableBumper") || state.animationType == 0))
         {
+            if (state.animationType == 0)
+                logger::debug("Force ending LoopEdgeCheck");
             state.animationType = 0;
             state.isAttacking = false;
             state.isLooping = false;

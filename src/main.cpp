@@ -755,20 +755,23 @@ public:
             state.untilMoveAgain = 0;
             state.untilMomentHide = 0;
             state.afterAttackTimer = 0;
-            if (event->tag == "PowerAttack_Start_end")
+            state.safeGroundedPositions.clear();
+            if (event->tag == "PowerAttack_Start_end") // Any Attack
                 state.animationType = 1;
-            else if (event->tag == "MCO_DodgeInitiate")
+            else if (event->tag == "MCO_DodgeInitiate") // DMCO
                 state.animationType = 2;
-            else if (event->tag == "RollTrigger")
+            else if (event->tag == "RollTrigger" || event->tag == "SidestepTrigger") // TUDMR
                 state.animationType = 3;
-            else if (event->tag == "TKDR_DodgeStart")
+            else if (event->tag == "TKDR_DodgeStart") // TK Dodge RE
                 state.animationType = 4;
-            else if (event->tag == "MCO_DisableSecondDodge")
+            else if (event->tag == "MCO_DisableSecondDodge") // Old DMCO
                 state.animationType = 5;
         }
-        else if (state.isAttacking && ((state.animationType == 1 && event->tag == "attackStop") || (state.animationType == 2 && event->payload == "$DMCO_Reset") ||
+        else if (state.isAttacking && ((state.animationType == 1 && event->tag == "attackStop") ||
+                                       (state.animationType == 2 && event->payload == "$DMCO_Reset") ||
                                        (state.animationType == 3 && event->tag == "RollStop") || (state.animationType == 4 && event->tag == "TKDR_DodgeEnd") ||
-                                       (state.animationType == 5 && event->tag == "EnableBumper") || state.animationType == 0))
+                                       (state.animationType == 5 && event->tag == "EnableBumper") ||
+                                       state.animationType == 0 || event->tag == "InterruptCast" || event->tag == "IdleStop" || event->tag == "JumpUp" || event->tag == "MTstate"))
         {
             if (state.animationType == 0)
                 logger::debug("Force ending LoopEdgeCheck");

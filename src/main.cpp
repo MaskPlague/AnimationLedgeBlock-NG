@@ -525,8 +525,10 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
         state.isOnLedge = ledgeDetected;
         state.loops = 0;
     }
-    // if (continued == numRays)
-    //     logger::trace(" All rays skipped");
+    if (!ledgeDetected && !actor->IsInMidair())
+    {
+        state.safeGroundedPositions.push_back(actorPos);
+    }
     return ledgeDetected;
 }
 

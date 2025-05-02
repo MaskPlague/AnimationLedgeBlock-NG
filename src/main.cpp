@@ -744,8 +744,8 @@ public:
         logger::trace("{} Payload: {}", holderName, event->payload);
         logger::trace("{} Tag: {}", holderName, event->tag);
         if (event->tag == "PowerAttack_Start_end" || event->tag == "MCO_DodgeInitiate" ||
-            event->tag == "RollTrigger" || event->tag == "TKDR_DodgeStart" ||
-            event->tag == "MCO_DisableSecondDodge")
+            event->tag == "RollTrigger" || event->tag == "SidestepTrigger" ||
+            event->tag == "TKDR_DodgeStart" || event->tag == "MCO_DisableSecondDodge")
         {
             state.isAttacking = true;
             logger::debug("Animation Started for {}", holderName);

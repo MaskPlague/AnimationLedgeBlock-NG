@@ -38,6 +38,8 @@ struct ActorState
     RE::TESObjectREFR *ledgeBlocker;
 
     std::vector<RE::TESObjectREFR *> rayMarkers;
+
+    std::vector<RE::NiPoint3> safeGroundedPositions;
 };
 
 inline std::unordered_map<RE::FormID, ActorState> g_actorStates;
@@ -557,11 +559,27 @@ void StopActorVelocity(RE::Actor *actor, ActorState &state)
     controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
     if (!physicalBlocker)
     {
-        logger::debug("Teleportation blocking {}", actor->GetName());
-        auto pos = actor->GetPosition();
-        RE::NiPoint3 dirVec(std::sin(state.bestYaw), std::cos(state.bestYaw), 0.0f);
-        auto backPos = pos - (dirVec * 4.0f);
-        actor->SetPosition(backPos, true);
+        if (logLevel > 2)
+            logger::debug("Teleportation blocking {}", actor->GetName());
+        bool teleported = false;
+        if (!state.safeGroundedPositions.empty())
+        {
+            auto backPos = state.safeGroundedPositions.back();
+            auto actorPos = actor->GetPosition();
+            auto distance = std::sqrt(pow(backPos.x - actorPos.x, 2) + pow(backPos.y - actorPos.y, 2) + pow(backPos.z - actorPos.z, 2));
+            if (distance < 100.0f)
+            {
+                actor->SetPosition(backPos, true);
+                teleported = true;
+            }
+        }
+        if (!teleported)
+        {
+            auto pos = actor->GetPosition();
+            RE::NiPoint3 dirVec(std::sin(state.bestYaw), std::cos(state.bestYaw), 0.0f);
+            auto backPos = pos - (dirVec * 4.0f);
+            actor->SetPosition(backPos, true);
+        }
     }
     else
     {
@@ -758,6 +776,7 @@ public:
             state.isAttacking = false;
             state.isLooping = false;
             state.movedBlocker = false;
+            state.safeGroundedPositions.clear();
             if (physicalBlocker)
                 state.ledgeBlocker->SetPosition(state.ledgeBlocker->GetPositionX(), state.ledgeBlocker->GetPositionY(), -10000.0f);
             logger::debug("Animation Finished for {}", holderName);

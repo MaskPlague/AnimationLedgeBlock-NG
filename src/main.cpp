@@ -12,7 +12,7 @@ static int physicalBlockerType = 0;
 static int memoryDuration = 10;
 
 const int numRays = 12; // Number of rays to create.
-constexpr int kRayMarkerCount = (numRays / 2) + numRays;
+constexpr int kRayMarkerCount = numRays * 2;
 
 struct ActorState
 {
@@ -198,7 +198,7 @@ void InitializeRayMarkers(RE::Actor *actor)
         return; // Already initialized
     }
 
-    auto markerBase = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00063B45);
+    auto markerBase = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0004e4e6);
     // meridias beacon 0004e4e6
     // garnet 00063B45
     if (!markerBase || !actor)
@@ -226,44 +226,6 @@ void InitializeRayMarkers(RE::Actor *actor)
     }
 }
 
-float GetActorDistanceToGround(RE::Actor *actor, RE::bhkWorld *const world)
-{
-    RE::NiPoint3 actorPos = actor->GetPosition();
-    RE::NiPoint3 rayFrom = {actorPos.x, actorPos.y, actorPos.z + 80.0f};
-    RE::NiPoint3 rayTo = rayFrom - RE::NiPoint3{0.0f, 0.0f, groundLeeway + 80.0f};
-    const auto havokWorldScale = RE::bhkWorld::GetWorldScale();
-    RE::bhkPickData pickData{};
-    pickData.rayInput.from = rayFrom * havokWorldScale;
-    pickData.rayInput.to = rayTo * havokWorldScale;
-    uint32_t collisionFilterInfo = 0;
-    actor->GetCollisionFilterInfo(collisionFilterInfo);
-    pickData.rayInput.filterInfo = (collisionFilterInfo & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
-    if (world->PickObject(pickData) && pickData.rayOutput.HasHit())
-    {
-        auto hitOwner = pickData.rayOutput.rootCollidable->GetOwner<RE::hkpRigidBody>();
-        RE::NiPoint3 delta = rayTo - rayFrom;
-        RE::NiPoint3 hitPos = rayFrom + delta * pickData.rayOutput.hitFraction;
-        if (hitOwner)
-        {
-            auto *userData = hitOwner->GetUserData();
-            auto *hitRef = userData ? userData->As<RE::TESObjectREFR>() : nullptr;
-            auto *hitObject = hitRef ? hitRef->GetBaseObject() : nullptr;
-
-            if (hitObject && (hitObject->Is(RE::FormType::Flora) || hitObject->Is(RE::FormType::Tree)))
-            {
-                auto hitRefPos = hitRef->GetPosition();
-                if (hitRefPos.z < hitPos.z && hitRefPos.z < rayTo.z)
-                    return 0.0f;
-                else if (hitRefPos.z < hitPos.z)
-                    hitPos = hitRefPos;
-            }
-        }
-        return actorPos.z - hitPos.z;
-    }
-
-    return 0.0f; // No hit = airborne or over void
-}
-
 float AverageAngles(const std::vector<float> &angles)
 {
     float x = 0.0f;
@@ -287,21 +249,32 @@ float NormalizeAngle(float angle)
     return std::fmod((angle + 2 * RE::NI_PI), (2 * RE::NI_PI));
 }
 
-float MaxZDist(std::vector<RE::NiPoint3> &hits)
+bool IsMaxMinZPastDropThreshold(std::vector<float> hitZ, std::vector<float> opHitZ, float actorZ)
 {
-    if (hits.empty())
-        return 0.0f;
-
-    float max = hits[0].z;
-    float min = hits[0].z;
-    for (RE::NiPoint3 hit : hits)
+    if (hitZ.empty() || opHitZ.empty())
+        return false;
+    float max = opHitZ[0];
+    for (float z : opHitZ)
     {
-        if (hit.z > max)
-            max = hit.z;
-        else if (hit.z < min)
-            min = hit.z;
+        if (z > max)
+            max = z;
     }
-    return max - min;
+    if (max > actorZ)
+        max = actorZ;
+    if (max <= actorZ - groundLeeway)
+        return false;
+    float min = hitZ[0];
+    for (float z : hitZ)
+    {
+        if (z < min)
+            min = z;
+    }
+    auto diff = max - min;
+    logger::trace("Diff {}", diff);
+    if (diff >= dropThreshold)
+        return true;
+    else
+        return false;
 }
 
 bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
@@ -367,75 +340,24 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
     for (int i = 0; i < numRays; ++i)
     {
         yawOffsets.push_back(actorYaw + i * angleStep);
-    }
-    if (actor->IsInMidair())
-    {
-        auto distFromGround = GetActorDistanceToGround(actor, bhkWorld);
-        // If over a certain distance from ground, create and cast far rays to get slope of terrain
-        if (distFromGround == 0.0f)
-        {
-            std::vector<RE::NiPoint3> hitPositions;
-            for (float yaw : yawOffsets)
-            {
-                RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
-                float dirLength = dirVec.Length();
-                if (dirLength == 0.0f)
-                    continue;
-                RE::NiPoint3 normalizedDir = dirVec / dirLength;
-                RE::NiPoint3 rayFrom = actorPos + (normalizedDir * 200.0f) + RE::NiPoint3(0, 0, 80);
-                RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
-
-                RE::bhkPickData ray;
-                ray.rayInput.from = rayFrom * havokWorldScale;
-                ray.rayInput.to = rayTo * havokWorldScale;
-                ray.rayInput.filterInfo = filterInfo;
-                if (bhkWorld->PickObject(ray) && ray.rayOutput.HasHit())
-                {
-                    auto hitOwner = ray.rayOutput.rootCollidable->GetOwner<RE::hkpRigidBody>();
-                    RE::NiPoint3 delta = rayTo - rayFrom;
-                    RE::NiPoint3 hitPos = rayFrom + delta * ray.rayOutput.hitFraction;
-                    if (hitOwner)
-                    {
-                        auto *userData = hitOwner->GetUserData();
-                        auto *hitRef = userData ? userData->As<RE::TESObjectREFR>() : nullptr;
-                        auto *hitObject = hitRef ? hitRef->GetBaseObject() : nullptr;
-
-                        if (hitObject && (hitObject->Is(RE::FormType::Flora) || hitObject->Is(RE::FormType::Tree)))
-                        {
-                            auto hitRefPos = hitRef->GetPosition();
-                            if (hitRefPos.z < hitPos.z)
-                                hitPos = hitRefPos;
-                        }
-                    }
-
-                    if (hitPos.z > actorPos.z + 40.0F)
-                        continue;
-                    hitPositions.push_back(hitPos);
-                }
-            }
-            auto heightDiff = MaxZDist(hitPositions);
-            if ((0.01f < heightDiff) && (heightDiff < 300.0f))
-            {
-                // logger::trace("HeightDiff of {} is less than 300.0f, returing false", heightDiff);
-                ++state.loops;
-                if (state.loops > memoryDuration)
-                    state.isOnLedge = false;
-                return false;
-            }
-        }
-    }
+    };
     int i = 0; // increment into ray markers
     bool ledgeDetected = false;
     std::vector<float> validYaws;
-    // int continued = 0;
+    float distFromPlayer = ledgeDistance;
+    bool alFlag1;
+    bool alFlag2;
+    bool oppositeDir;
+    std::vector<float> hitZ;
+    std::vector<float> opHitZ;
     for (float yaw : yawOffsets)
     {
+        distFromPlayer = ledgeDistance;
+        oppositeDir = false;
         RE::NiPoint3 dirVec(std::sin(yaw), std::cos(yaw), 0.0f);
         float dirLength = dirVec.Length();
         if (dirLength == 0.0f)
         {
-            // continued++;
-            // logger::trace(" Skipping ray as dirLength is 0.0f, {}.", continued);
             continue;
         }
         RE::NiPoint3 normalizedDir = dirVec / dirLength;
@@ -444,21 +366,28 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
         if (velocityLength > 0.0f)
         {
             float alignment = normalizedDir.Dot(moveDirection);
+            float opAlignment = -(normalizedDir).Dot(moveDirection);
+            alFlag1 = false;
+            alFlag2 = false;
             if (alignment < directionThreshold)
+                alFlag1 = true;
+            if (opAlignment < directionThreshold)
+                alFlag2 = true;
+            else
             {
-                // continued++;
-                // logger::trace(" Skipping ray as it is not in correct direction, {}.", continued);
-                continue;
+                distFromPlayer = 100.0f;
+                oppositeDir = true;
             }
+
+            if (alFlag1 && alFlag2)
+                continue;
         }
         else
         {
-            // continued++;
-            // logger::trace(" Skipping ray as the velocity is not above 0.0f, {}", continued);
             continue;
         }
 
-        RE::NiPoint3 rayFrom = actorPos + (normalizedDir * ledgeDistance) + RE::NiPoint3(0, 0, 80);
+        RE::NiPoint3 rayFrom = actorPos + (normalizedDir * distFromPlayer) + RE::NiPoint3(0, 0, 80);
         RE::NiPoint3 rayTo = rayFrom + RE::NiPoint3(0, 0, -rayLength);
 
         RE::bhkPickData ray;
@@ -492,25 +421,21 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
                     marker->SetPosition(hitPos.x, hitPos.y, hitPos.z + 20);
                 ++i;
             }
-            if (hitPos.z > actorPos.z - 50.0f)
-            {
-                // logger::trace("Hit surface is above actorPos.z - 50.0f");
-                // continued++;
-                continue;
-            }
-
+            if (oppositeDir)
+                opHitZ.push_back(hitPos.z);
+            else
+                hitZ.push_back(hitPos.z);
             float verticalDrop = actorPos.z - hitPos.z;
             if (verticalDrop > dropThreshold)
             {
                 // logger::trace("Hit below drop threshold at {:.2f}, cliff detected", verticalDrop);
-                ledgeDetected = true;
+                // ledgeDetected = true;
                 validYaws.push_back(yaw);
             }
         }
         else if (physicalBlocker)
         {
-            // logger::trace("Ray missed, must be cliff.");
-            ledgeDetected = true;
+            // ledgeDetected = true;
             validYaws.push_back(yaw);
         }
     }
@@ -518,6 +443,12 @@ bool IsLedgeAhead(RE::Actor *actor, ActorState &state)
     {
         float yaw = AverageAngles(validYaws);
         state.bestYaw = NormalizeAngle(yaw);
+    }
+    if (opHitZ.empty())
+        opHitZ.push_back(actorPos.z);
+    if (!hitZ.empty())
+    {
+        ledgeDetected = IsMaxMinZPastDropThreshold(hitZ, opHitZ, actor->GetPositionZ());
     }
     ++state.loops;
     if (ledgeDetected || state.loops > memoryDuration)

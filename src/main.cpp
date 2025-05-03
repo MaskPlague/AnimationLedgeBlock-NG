@@ -113,42 +113,46 @@ void LoadConfig()
     // Read values:
     physicalBlocker = ini.GetBoolValue("General", "PhysicalBlocker", true);
     physicalBlockerType = ini.GetLongValue("General", "PhysicalBlockerType", 0);
-    dropThreshold = static_cast<float>(ini.GetDoubleValue("General", "DropThreshold", 150.0f));
+    disableOnStairs = ini.GetBoolValue("General", "DisableOnStairs", true);
+    enableForNPCs = ini.GetBoolValue("General", "EnableNPCs", true);
+    dropThreshold = static_cast<float>(ini.GetDoubleValue("Tweaks", "DropThreshold", 150.0f));
     if (dropThreshold > 600.0f)
         dropThreshold = 590.0f;
-    ledgeDistance = static_cast<float>(ini.GetDoubleValue("General", "LedgeDistance", 50.0f));
+    ledgeDistance = static_cast<float>(ini.GetDoubleValue("Tweaks", "LedgeDistance", 50.0f));
     if (physicalBlocker && ledgeDistance < 50.0f)
         ledgeDistance = 50.0f;
     else if (!physicalBlocker && ledgeDistance < 10.0f)
         ledgeDistance = 10.0f;
-    groundLeeway = static_cast<float>(ini.GetDoubleValue("General", "GroundLeeway", 60.0f));
-    disableOnStairs = ini.GetBoolValue("General", "DisableOnStairs", true);
-    enableForNPCs = ini.GetBoolValue("General", "EnableNPCs", true);
-    memoryDuration = ini.GetLongValue("General", "MemoryDuration", 10);
+    groundLeeway = static_cast<float>(ini.GetDoubleValue("Tweaks", "GroundLeeway", 60.0f));
+    memoryDuration = ini.GetLongValue("Tweaks", "MemoryDuration", 10);
     if (memoryDuration < 1)
         memoryDuration = 1;
 
     logLevel = ini.GetLongValue("Debug", "LoggingLevel", 2);
+
     logger::debug("Version              {}", SKSE::PluginDeclaration::GetSingleton()->GetVersion());
     logger::debug("PhyscialBlocker:     {}", physicalBlocker);
     logger::debug("PhyscialBlockerType: {}", physicalBlockerType);
+    logger::debug("DisableOnStairs      {}", disableOnStairs);
+    logger::debug("EnableNPCs:          {}", enableForNPCs);
     logger::debug("DropThreshold:       {:.2f}", dropThreshold);
     logger::debug("LedgeDistance:       {:.2f}", ledgeDistance);
     logger::debug("GroundLeeway         {:.2f}", groundLeeway);
-    logger::debug("DisableOnStairs      {}", disableOnStairs);
     logger::debug("MemoryDuration:      {}", memoryDuration);
-    logger::debug("EnableNPCs:          {}", enableForNPCs);
+
     logger::debug("LoggingLevel:        {}", logLevel);
 
     // Optionally write defaults back for any missing keys:
     ini.SetBoolValue("General", "PhysicalBlocker", physicalBlocker);
     ini.SetLongValue("General", "PhysicalBlockerType", physicalBlockerType);
-    ini.SetDoubleValue("General", "DropThreshold", static_cast<double>(dropThreshold));
-    ini.SetDoubleValue("General", "LedgeDistance", static_cast<double>(ledgeDistance));
-    ini.SetDoubleValue("General", "GroundLeeway", static_cast<double>(groundLeeway));
     ini.SetBoolValue("General", "DisableOnStairs", disableOnStairs);
-    ini.SetLongValue("General", "MemoryDuration", memoryDuration);
     ini.SetBoolValue("General", "EnableNPCs", enableForNPCs);
+
+    ini.SetDoubleValue("Tweaks", "DropThreshold", static_cast<double>(dropThreshold));
+    ini.SetDoubleValue("Tweaks", "LedgeDistance", static_cast<double>(ledgeDistance));
+    ini.SetDoubleValue("Tweaks", "GroundLeeway", static_cast<double>(groundLeeway));
+    ini.SetLongValue("Tweaks", "MemoryDuration", memoryDuration);
+
     ini.SetLongValue("Debug", "LoggingLevel", logLevel);
     ini.SaveFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
 }
@@ -493,7 +497,7 @@ void StopActorVelocity(RE::Actor *actor, ActorState &state)
     if (!physicalBlocker)
     {
         if (logLevel > 2)
-            logger::debug("Teleportation blocking {}", actor->GetName());
+            logger::trace("Teleportation blocking {}", actor->GetName());
         bool teleported = false;
         if (!state.safeGroundedPositions.empty())
         {
@@ -518,7 +522,7 @@ void StopActorVelocity(RE::Actor *actor, ActorState &state)
     {
         if (!state.movedBlocker)
         {
-            logger::debug("Moving a physcial blocker to {}", actor->GetName());
+            logger::trace("Moving a physcial blocker to {}", actor->GetName());
             auto actorPos = actor->GetPosition();
             RE::NiPoint3 objDir(std::sin(state.bestYaw), std::cos(state.bestYaw), 0.0f);
             objDir.Unitize();

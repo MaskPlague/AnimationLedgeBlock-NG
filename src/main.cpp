@@ -704,10 +704,11 @@ public:
             else if (event->tag == "MCO_DisableSecondDodge") // Old DMCO
                 state.animationType = 5;
         }
-        else if (state.isAttacking && ((state.animationType == 1 && event->tag == "attackStop") ||
-                                       (state.animationType == 2 && event->payload == "$DMCO_Reset") ||
-                                       (state.animationType == 3 && event->tag == "RollStop") || (state.animationType == 4 && event->tag == "TKDR_DodgeEnd") ||
-                                       (state.animationType == 5 && event->tag == "EnableBumper") ||
+        else if (state.isAttacking &&
+                 ((state.animationType == 1 && event->tag == "attackStop") ||
+                  (state.animationType == 2 && event->payload == "$DMCO_Reset") ||
+                  (state.animationType == 3 && event->tag == "RollStop") || (state.animationType == 4 && event->tag == "TKDR_DodgeEnd") ||
+                  (state.animationType == 5 && event->tag == "EnableBumper") ||
                   state.animationType == 0 || (state.animationType != 1 && event->tag == "InterruptCast") || event->tag == "IdleStop" || event->tag == "JumpUp" || event->tag == "MTstate"))
         {
             if (state.animationType == 0)

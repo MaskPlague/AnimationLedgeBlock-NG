@@ -10,6 +10,7 @@ static float ledgeDistance = 50.0f;  // 50.0 units around the player
 static float groundLeeway = 60.0f;
 static int physicalBlockerType = 0;
 static int memoryDuration = 10;
+static float jumpDuration = 1.5f;
 
 const int numRays = 12; // Number of rays to create.
 constexpr int kRayMarkerCount = numRays * 2;
@@ -32,6 +33,9 @@ struct ActorState
     int afterAttackTimer = 0;
 
     int animationType = 0;
+
+    int jumpStart = 0;
+    bool isJumping = false;
 
     RE::TESObjectCELL *lastActorCell;
 
@@ -124,6 +128,7 @@ void LoadConfig()
     else if (!physicalBlocker && ledgeDistance < 10.0f)
         ledgeDistance = 10.0f;
     groundLeeway = static_cast<float>(ini.GetDoubleValue("Tweaks", "GroundLeeway", 60.0f));
+    jumpDuration = static_cast<float>(ini.GetDoubleValue("Tweaks", "JumpDuration", jumpDuration));
     memoryDuration = ini.GetLongValue("Tweaks", "MemoryDuration", 10);
     if (memoryDuration < 1)
         memoryDuration = 1;
@@ -137,6 +142,7 @@ void LoadConfig()
     logger::debug("EnableNPCs:          {}", enableForNPCs);
     logger::debug("DropThreshold:       {:.2f}", dropThreshold);
     logger::debug("LedgeDistance:       {:.2f}", ledgeDistance);
+    logger::debug("JumpDuration         {:.2f}", jumpDuration);
     logger::debug("GroundLeeway         {:.2f}", groundLeeway);
     logger::debug("MemoryDuration:      {}", memoryDuration);
 
@@ -150,6 +156,7 @@ void LoadConfig()
 
     ini.SetDoubleValue("Tweaks", "DropThreshold", static_cast<double>(dropThreshold));
     ini.SetDoubleValue("Tweaks", "LedgeDistance", static_cast<double>(ledgeDistance));
+    ini.SetDoubleValue("Tweaks", "JumpDuration", jumpDuration);
     ini.SetDoubleValue("Tweaks", "GroundLeeway", static_cast<double>(groundLeeway));
     ini.SetLongValue("Tweaks", "MemoryDuration", memoryDuration);
 
@@ -635,7 +642,15 @@ void LoopEdgeCheck(RE::Actor *actor)
             }
 
             auto& state = it->second;
-            if (state.isAttacking || state.isOnLedge) {
+            if(state.isJumping && (jumpDuration > (float)(clock() - state.jumpStart) / CLOCKS_PER_SEC)){
+                //logger::trace("Jumping for {}", (float)(clock() - state.jumpStart) / CLOCKS_PER_SEC);
+                continue;
+            }
+            else if(state.isJumping)
+                state.isJumping = false;
+
+            if (state.isAttacking || state.isOnLedge)
+            {
                 if (!state.isAttacking && state.isOnLedge)
                     ++state.afterAttackTimer;
                 if (!state.isAttacking && state.isOnLedge && state.afterAttackTimer > 25)
@@ -721,6 +736,11 @@ public:
             if (physicalBlocker)
                 state.ledgeBlocker->SetPosition(state.ledgeBlocker->GetPositionX(), state.ledgeBlocker->GetPositionY(), -10000.0f);
             logger::debug("Animation Finished for {}", holderName);
+        }
+        else if (!state.isAttacking && event->tag == "JumpUp")
+        {
+            state.jumpStart = clock();
+            state.isJumping = true;
         }
 
         return RE::BSEventNotifyControl::kContinue;

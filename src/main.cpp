@@ -9,6 +9,7 @@ namespace
     bool disable_on_stairs = true;
     bool enable_for_attacks = true;
     bool enable_for_dodges = true;
+    bool enable_for_slides = true;
     float drop_threshold = 150.0f; // 1.5x 1.0 player height
     float ledge_distance = 50.0f;  // 50.0 units around the player
     float ground_leeway = 60.0f;
@@ -126,6 +127,7 @@ namespace
         enable_for_npcs = ini.GetBoolValue("General", "EnableNPCs", true);
         enable_for_attacks = ini.GetBoolValue("General", "EnableAttackBlocking", true);
         enable_for_dodges = ini.GetBoolValue("General", "EnableDodgeBlocking", true);
+        enable_for_slides = ini.GetBoolValue("General", "EnableSlideBlocking", true);
         drop_threshold = static_cast<float>(ini.GetDoubleValue("Tweaks", "DropThreshold", 150.0f));
         if (drop_threshold > 600.0f)
             drop_threshold = 590.0f;
@@ -148,6 +150,7 @@ namespace
         logger::debug("EnableNPCs:          {}", enable_for_npcs);
         logger::debug("EnableAttackBlocking:{}", enable_for_attacks);
         logger::debug("EnableDodgeBlocking: {}", enable_for_dodges);
+        logger::debug("EnableSlideBlocking: {}", enable_for_slides);
         logger::debug("DropThreshold:       {:.2f}", drop_threshold);
         logger::debug("LedgeDistance:       {:.2f}", ledge_distance);
         logger::debug("JumpDuration         {:.2f}", jump_duration);
@@ -163,6 +166,7 @@ namespace
         ini.SetBoolValue("General", "EnableNPCs", enable_for_npcs);
         ini.SetBoolValue("General", "EnableAttackBlocking", enable_for_attacks);
         ini.SetBoolValue("General", "EnableDodgeBlocking", enable_for_dodges);
+        ini.SetBoolValue("General", "EnableSlideBlocking", enable_for_slides);
 
         ini.SetDoubleValue("Tweaks", "DropThreshold", static_cast<double>(drop_threshold));
         ini.SetDoubleValue("Tweaks", "LedgeDistance", static_cast<double>(ledge_distance));
@@ -692,7 +696,8 @@ namespace
             if ((enable_for_attacks && event->tag == "PowerAttack_Start_end") ||
                 (enable_for_dodges && (event->tag == "MCO_DodgeInitiate" ||
                                        event->tag == "RollTrigger" || event->tag == "SidestepTrigger" ||
-                                       event->tag == "TKDR_DodgeStart" || event->tag == "MCO_DisableSecondDodge")))
+                                       event->tag == "TKDR_DodgeStart" || event->tag == "MCO_DisableSecondDodge")) ||
+                (enable_for_slides && event->tag == "SlideStart"))
             {
                 state.is_attacking = true;
                 logger::debug("Animation Started for {}", holder_name);
@@ -713,13 +718,17 @@ namespace
                     state.animation_type = 4;
                 else if (event->tag == "MCO_DisableSecondDodge") // Old DMCO
                     state.animation_type = 5;
+                else if (event->tag == "SlideStart") // Crouch Sliding
+                    state.animation_type = 6;
             }
             else if (state.is_attacking &&
                      ((state.animation_type == 1 && event->tag == "attackStop") ||
                       (state.animation_type == 2 && event->payload == "$DMCO_Reset") ||
                       (state.animation_type == 3 && event->tag == "RollStop") || (state.animation_type == 4 && event->tag == "TKDR_DodgeEnd") ||
                       (state.animation_type == 5 && event->tag == "EnableBumper") ||
-                      state.animation_type == 0 || (state.animation_type != 1 && event->tag == "InterruptCast") || event->tag == "IdleStop" || event->tag == "JumpUp" || event->tag == "MTstate"))
+                      (state.animation_type == 6 && event->tag == "SlideStop") ||
+                      state.animation_type == 0 || (state.animation_type != 1 && event->tag == "InterruptCast") ||
+                      event->tag == "IdleStop" || event->tag == "JumpUp" || event->tag == "MTstate"))
             {
                 if (state.animation_type == 0)
                     logger::debug("Force ending LoopEdgeCheck");

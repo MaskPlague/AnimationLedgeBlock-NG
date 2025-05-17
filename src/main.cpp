@@ -727,8 +727,10 @@ namespace
                       (state.animation_type == 3 && event->tag == "RollStop") || (state.animation_type == 4 && event->tag == "TKDR_DodgeEnd") ||
                       (state.animation_type == 5 && event->tag == "EnableBumper") ||
                       (state.animation_type == 6 && event->tag == "SlideStop") ||
-                      state.animation_type == 0 || (state.animation_type != 1 && event->tag == "InterruptCast") ||
-                      event->tag == "IdleStop" || event->tag == "JumpUp" || event->tag == "MTstate"))
+                      state.animation_type == 0 ||
+                      (state.animation_type != 1 && event->tag == "InterruptCast") ||
+                      (state.animation_type != 4 && event->tag == "IdleStop") ||
+                      event->tag == "JumpUp" || event->tag == "MTstate"))
             {
                 if (state.animation_type == 0)
                     logger::debug("Force ending LoopEdgeCheck");

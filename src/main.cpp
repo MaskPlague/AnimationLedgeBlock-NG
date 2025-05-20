@@ -144,7 +144,7 @@ namespace
         log_level = ini.GetLongValue("Debug", "LoggingLevel", 2);
 
         logger::debug("Version              {}", SKSE::PluginDeclaration::GetSingleton()->GetVersion());
-        logger::debug("Physical Blocker:     {}", physical_blocker);
+        logger::debug("Physical Blocker:    {}", physical_blocker);
         logger::debug("PhysicalBlockerType: {}", physical_blocker_type);
         logger::debug("DisableOnStairs      {}", disable_on_stairs);
         logger::debug("EnableNPCs:          {}", enable_for_npcs);
@@ -728,9 +728,9 @@ namespace
                       (state.animation_type == 5 && event->tag == "EnableBumper") ||
                       (state.animation_type == 6 && event->tag == "SlideStop") ||
                       state.animation_type == 0 ||
-                      (state.animation_type != 1 && event->tag == "InterruptCast") ||
+                      (state.animation_type != 1 && state.animation_type != 4 && event->tag == "InterruptCast") ||
                       (state.animation_type != 4 && event->tag == "IdleStop") ||
-                      event->tag == "JumpUp" || event->tag == "MTstate"))
+                      event->tag == "JumpUp" || event->tag == "MTstate" || event->tag == "CastStop"))
             {
                 if (state.animation_type == 0)
                     logger::debug("Force ending LoopEdgeCheck");

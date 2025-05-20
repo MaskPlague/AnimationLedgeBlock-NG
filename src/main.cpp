@@ -724,7 +724,8 @@ namespace
             else if (state.is_attacking &&
                      ((state.animation_type == 1 && event->tag == "attackStop") ||
                       (state.animation_type == 2 && event->payload == "$DMCO_Reset") ||
-                      (state.animation_type == 3 && event->tag == "RollStop") || (state.animation_type == 4 && event->tag == "TKDR_DodgeEnd") ||
+                      (state.animation_type == 3 && event->tag == "RollStop") ||
+                      (state.animation_type == 4 && event->tag == "TKDR_DodgeEnd") ||
                       (state.animation_type == 5 && event->tag == "EnableBumper") ||
                       (state.animation_type == 6 && event->tag == "SlideStop") ||
                       state.animation_type == 0 ||

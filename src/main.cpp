@@ -731,7 +731,7 @@ namespace
                       state.animation_type == 0 ||
                       (state.animation_type != 1 && state.animation_type != 4 && event->tag == "InterruptCast") ||
                       (state.animation_type != 4 && event->tag == "IdleStop") ||
-                      event->tag == "JumpUp" || event->tag == "MTstate" || event->tag == "CastStop"))
+                      event->tag == "JumpUp" || event->tag == "MTstate"))
             {
                 if (state.animation_type == 0)
                     logger::debug("Force ending LoopEdgeCheck");

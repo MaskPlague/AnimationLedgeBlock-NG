@@ -1,7 +1,7 @@
 {
     "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
     "name": "animation-ledge-block-ng",
-    "version-string": "0.2.12",
+    "version-string": "0.2.13",
     "dependencies": [
         "commonlibsse-ng"
     ]

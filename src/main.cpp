@@ -455,6 +455,13 @@ namespace
             {
                 valid_yaws.push_back(yaw);
             }
+            else
+            {
+                if (opposite_dir)
+                    op_hit_z.push_back(actor_pos.z - drop_threshold - 10);
+                else
+                    hit_z.push_back(actor_pos.z - drop_threshold - 10);
+            }
         }
         if (!valid_yaws.empty())
         {

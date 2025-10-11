@@ -6,6 +6,12 @@
 #include "SimpleIni.h"
 #include <spdlog/sinks/basic_file_sink.h>
 #include <windows.h>
+#include "Globals.h"
+#include "Config.h"
+#include "Events.h"
+#include "MathUtils.h"
+#include "Objects.h"
+#include "Utils.h"
 
 #define DLLEXPORT __declspec(dllexport)
 

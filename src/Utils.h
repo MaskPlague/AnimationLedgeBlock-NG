@@ -6,5 +6,9 @@ namespace Utils
 
     bool IsLedgeAhead(RE::Actor *actor, Globals::ActorState &state);
 
-    void LoopEdgeCheck(RE::Actor *actor);
+    void CellChangeCheck(RE::Actor *actor);
+
+    void EdgeCheck(RE::Actor *actor, Globals::ActorState &state);
+
+    void CheckAllActorsForLedges();
 }

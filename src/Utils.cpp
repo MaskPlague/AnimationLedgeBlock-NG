@@ -295,12 +295,11 @@ namespace Utils
         }
     }
 
-    void EdgeCheck(RE::Actor *actor)
+    void EdgeCheck(RE::Actor *actor, Globals::ActorState &state)
     {
-        if (const Globals::ActorState *state_check = Globals::CheckState(actor); !state_check)
+        Globals::ActorState *stateCheck = Globals::CheckState(actor);
+        if (!stateCheck || !actor)
             return;
-
-        auto &state = Globals::GetState(actor);
         if (!Globals::physical_blocker)
         {
             // logger::trace("Checking for ledge."sv);
@@ -335,67 +334,32 @@ namespace Utils
         }
     }
 
-    bool IsGameWindowFocused()
+    void CheckAllActorsForLedges()
     {
-        const HWND foreground = ::GetForegroundWindow();
-        DWORD foreground_pid = 0;
-        ::GetWindowThreadProcessId(foreground, &foreground_pid);
-        return foreground_pid == ::GetCurrentProcessId();
-    }
+        for (auto actor_state : Globals::g_actor_states)
+        {
+            auto form_id = actor_state.first;
+            auto actor_ptr = RE::TESForm::LookupByID<RE::Actor>(form_id);
+            if (!actor_ptr)
+                continue;
+            auto &state = actor_state.second;
+            if (state.is_jumping && (Globals::jump_duration > static_cast<float>(clock() - state.jump_start) / CLOCKS_PER_SEC))
+                continue;
+            else if (state.is_jumping)
+                state.is_jumping = false;
 
-    void LoopEdgeCheck(RE::Actor *actor)
-    {
-        if (!actor)
-            return;
-        logger::trace("Starting Edge check loop");
-        std::thread([actor]()
-                    {
-                RE::FormID form_id = actor->GetFormID();
-                while (true) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(11));
-                    if (!IsGameWindowFocused())
-                    {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                        //logger::trace("Window is tabbed out, stalling loop");
-                        continue;
-                    }
-                    auto it = Globals::g_actor_states.find(form_id);
-                    if (it == Globals::g_actor_states.end()) {
-                        //logger::trace("Actor state no longer exists, ending LoopEdgeCheck");
-                        break;
-                    }
-
-                    if (const auto actor_ptr = RE::TESForm::LookupByID<RE::Actor>(form_id); !actor_ptr) {
-                        break;
-                    }
-
-                    auto& state = it->second;
-                    if (state.is_jumping && (Globals::jump_duration > static_cast<float>(clock() - state.jump_start) / CLOCKS_PER_SEC)) {
-                        //logger::trace("Jumping for {}", (float)(clock() - state.jump_start) / CLOCKS_PER_SEC);
-                        continue;
-                    }
-                    else if (state.is_jumping)
-                        state.is_jumping = false;
-
-                    if (state.is_attacking || state.is_on_ledge)
-                    {
-                        if (!state.is_attacking && state.is_on_ledge)
-                            ++state.after_attack_timer;
-                        if (!state.is_attacking && state.is_on_ledge && state.after_attack_timer > 25)
-                        {
-                            state.after_attack_timer = 0;
-                            break;
-                        }
-                        SKSE::GetTaskInterface()->AddTask([actor]()
-                            {
-                                CellChangeCheck(actor);
-                                EdgeCheck(actor);
-                            });
-                    }
-                    else {
-                        break;
-                    }
-                } })
-            .detach();
+            if (state.is_attacking || state.is_on_ledge)
+            {
+                if (!state.is_attacking && state.is_on_ledge)
+                    ++state.after_attack_timer;
+                if (!state.is_attacking && state.is_on_ledge && state.after_attack_timer > 25)
+                {
+                    state.after_attack_timer = 0;
+                    continue;
+                }
+                CellChangeCheck(actor_ptr);
+                EdgeCheck(actor_ptr, state);
+            }
+        }
     }
 }

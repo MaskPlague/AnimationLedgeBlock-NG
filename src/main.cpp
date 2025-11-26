@@ -57,6 +57,10 @@ namespace
         Config::SetLogLevel();
 
         SKSE::GetMessagingInterface()->RegisterListener("SKSE", MessageHandler);
+        if (Hook::Install())
+            logger::info("  >Hook installed"sv);
+        else
+            SKSE::stl::report_and_fail("Failed to install necessary hook."sv);
 
         logger::info("Animation Ledge Block NG Plugin Loaded"sv);
 

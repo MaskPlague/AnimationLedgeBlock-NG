@@ -14,6 +14,7 @@ namespace logger = SKSE::log;
 #include "MathUtils.h"
 #include "Objects.h"
 #include "Utils.h"
+#include "Hook.h"
 
 #define DLLEXPORT __declspec(dllexport)
 

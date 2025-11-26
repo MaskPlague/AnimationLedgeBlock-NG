@@ -145,7 +145,7 @@ namespace Utils
         // Yaw offsets to use for rays around the actor
         float actor_yaw = actor->GetAngleZ();
         std::vector<float> yaw_offsets;
-        float angle_step = static_cast<float>(2.0 * RE::NI_PI / static_cast<long double>(Globals::enable_for_dodges));
+        float angle_step = static_cast<float>(2.0 * RE::NI_PI / static_cast<long double>(Globals::num_rays));
         for (int i = 0; i < Globals::num_rays; ++i)
         {
             yaw_offsets.push_back(actor_yaw + i * angle_step);

@@ -135,7 +135,9 @@ namespace Utils
 
         // Filter out actor collision from rays
         uint32_t collision_filter_info = 0;
-        actor->GetCollisionFilterInfo(collision_filter_info);
+        RE::CFilter collision_filter_info_cfilter;
+        actor->GetCollisionFilterInfo(collision_filter_info_cfilter);
+        collision_filter_info = collision_filter_info_cfilter.filter;
         uint32_t filter_info = (collision_filter_info & 0xFFFF0000) | static_cast<uint32_t>(RE::COL_LAYER::kLOS);
         RE::NiPoint3 move_direction = {0.0f, 0.0f, 0.0f};
         if (velocity_length > 0.0f)
@@ -202,7 +204,7 @@ namespace Utils
             RE::bhkPickData ray;
             ray.rayInput.from = ray_from * havok_world_scale;
             ray.rayInput.to = ray_to * havok_world_scale;
-            ray.rayInput.filterInfo = filter_info;
+            ray.rayInput.filterInfo.filter = filter_info;
 
             if (bhk_world->PickObject(ray) && ray.rayOutput.HasHit())
             {

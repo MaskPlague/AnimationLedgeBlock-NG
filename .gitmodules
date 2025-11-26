@@ -1,0 +1,3 @@
+[submodule "lib/CommonLibSSE-NG"]
+	path = lib/CommonLibSSE-NG
+	url = https://github.com/alandtse/CommonLibVR

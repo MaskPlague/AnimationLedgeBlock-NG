@@ -1,5 +1,3 @@
-namespace logger = SKSE::log;
-
 namespace MathUtils
 {
     float AverageAngles(const std::vector<float> &angles)
@@ -43,7 +41,7 @@ namespace MathUtils
             min = std::min(min, z);
         }
         auto diff = max - min;
-        logger::trace("Diff {}", diff);
+        logger::trace("Diff {}"sv, diff);
         if (diff >= Globals::drop_threshold)
             return true;
         else

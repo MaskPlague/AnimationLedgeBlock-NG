@@ -1,5 +1,3 @@
-namespace logger = SKSE::log;
-
 namespace Objects
 {
     bool CreateLedgeBlocker(RE::Actor *actor)
@@ -7,7 +5,7 @@ namespace Objects
         auto *handler = RE::TESDataHandler::GetSingleton();
         if (!handler || !actor)
         {
-            logger::warn("Error, could not get TESDataHandler");
+            logger::warn("Error, could not get TESDataHandler"sv);
             return true;
         }
         RE::TESObjectSTAT *blocker;
@@ -25,10 +23,10 @@ namespace Objects
         default: // Default Half Ring wall
             blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
         }
-        logger::trace("using blocker type {}", Globals::physical_blocker_type);
+        logger::trace("using blocker type {}"sv, Globals::physical_blocker_type);
         if (!blocker)
         {
-            logger::warn("Could not access Animation Ledge Block NG.esp");
+            logger::warn("Could not access Animation Ledge Block NG.esp"sv);
             return true;
         }
         auto placed = actor->PlaceObjectAtMe(blocker, true);

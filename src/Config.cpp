@@ -1,5 +1,3 @@
-namespace logger = SKSE::log;
-
 namespace Config
 {
     void SetUpLog()
@@ -53,7 +51,7 @@ namespace Config
         SI_Error rc = ini.LoadFile("Data\\SKSE\\Plugins\\AnimationLedgeBlockNG.ini");
         if (rc < 0)
         {
-            logger::warn("Could not load AnimationLedgeBlockNG.ini, using defaults");
+            logger::warn("Could not load AnimationLedgeBlockNG.ini, using defaults"sv);
         }
 
         // Read values:
@@ -79,21 +77,21 @@ namespace Config
 
         Globals::log_level = ini.GetLongValue("Debug", "LoggingLevel", 2);
 
-        logger::debug("Version              {}", SKSE::PluginDeclaration::GetSingleton()->GetVersion());
-        logger::debug("Physical Blocker:    {}", Globals::physical_blocker);
-        logger::debug("PhysicalBlockerType: {}", Globals::physical_blocker_type);
-        logger::debug("DisableOnStairs      {}", Globals::disable_on_stairs);
-        logger::debug("EnableNPCs:          {}", Globals::enable_for_npcs);
-        logger::debug("EnableAttackBlocking:{}", Globals::enable_for_attacks);
-        logger::debug("EnableDodgeBlocking: {}", Globals::enable_for_dodges);
-        logger::debug("EnableSlideBlocking: {}", Globals::enable_for_slides);
-        logger::debug("DropThreshold:       {:.2f}", Globals::drop_threshold);
-        logger::debug("LedgeDistance:       {:.2f}", Globals::ledge_distance);
-        logger::debug("JumpDuration         {:.2f}", Globals::jump_duration);
-        logger::debug("GroundLeeway         {:.2f}", Globals::ground_leeway);
-        logger::debug("MemoryDuration:      {}", Globals::memory_duration);
+        logger::debug("Version              {}"sv, SKSE::PluginDeclaration::GetSingleton()->GetVersion());
+        logger::debug("Physical Blocker:    {}"sv, Globals::physical_blocker);
+        logger::debug("PhysicalBlockerType: {}"sv, Globals::physical_blocker_type);
+        logger::debug("DisableOnStairs      {}"sv, Globals::disable_on_stairs);
+        logger::debug("EnableNPCs:          {}"sv, Globals::enable_for_npcs);
+        logger::debug("EnableAttackBlocking:{}"sv, Globals::enable_for_attacks);
+        logger::debug("EnableDodgeBlocking: {}"sv, Globals::enable_for_dodges);
+        logger::debug("EnableSlideBlocking: {}"sv, Globals::enable_for_slides);
+        logger::debug("DropThreshold:       {:.2f}"sv, Globals::drop_threshold);
+        logger::debug("LedgeDistance:       {:.2f}"sv, Globals::ledge_distance);
+        logger::debug("JumpDuration         {:.2f}"sv, Globals::jump_duration);
+        logger::debug("GroundLeeway         {:.2f}"sv, Globals::ground_leeway);
+        logger::debug("MemoryDuration:      {}"sv, Globals::memory_duration);
 
-        logger::debug("LoggingLevel:        {}", Globals::log_level);
+        logger::debug("LoggingLevel:        {}"sv, Globals::log_level);
 
         // Optionally write defaults back for any missing keys:
         ini.SetBoolValue("General", "PhysicalBlocker", Globals::physical_blocker);

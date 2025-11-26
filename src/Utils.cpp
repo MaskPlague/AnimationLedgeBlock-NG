@@ -1,5 +1,3 @@
-namespace logger = SKSE::log;
-
 namespace Utils
 {
     void CleanupActors()
@@ -43,7 +41,7 @@ namespace Utils
         auto *controller = actor->GetCharController();
         if (!controller)
         {
-            logger::warn("Could not get actor character controller");
+            logger::warn("Could not get actor character controller"sv);
             return;
         }
 
@@ -51,7 +49,7 @@ namespace Utils
         if (!Globals::physical_blocker)
         {
             if (Globals::log_level > 2)
-                logger::trace("Teleportation blocking {}", actor->GetName());
+                logger::trace("Teleportation blocking {}"sv, actor->GetName());
             bool teleported = false;
             if (!state.safe_grounded_positions.empty())
             {
@@ -76,7 +74,7 @@ namespace Utils
         {
             if (!state.moved_blocker)
             {
-                logger::trace("Moving a physical blocker to {}", actor->GetName());
+                logger::trace("Moving a physical blocker to {}"sv, actor->GetName());
                 auto actor_pos = actor->GetPosition();
                 RE::NiPoint3 obj_dir(std::sin(state.best_yaw), std::cos(state.best_yaw), 0.0f);
                 obj_dir.Unitize();
@@ -94,40 +92,39 @@ namespace Utils
         Globals::ActorState *state_check = Globals::CheckState(actor);
         if (!state_check)
         {
-            logger::debug("Actor state no longer exists, cancel ledge check.");
+            logger::debug("Actor state no longer exists, cancel ledge check."sv);
             return false;
         }
 
         if (!actor || actor->AsActorState()->IsSwimming() || actor->AsActorState()->IsFlying())
         {
-            logger::warn("Either could not get actor or actor is swimming or on dragon.");
+            logger::warn("Either could not get actor or actor is swimming or on dragon."sv);
             return false;
         }
         auto char_controller = actor->GetCharController();
         if (char_controller && Globals::disable_on_stairs && char_controller->flags.any(RE::CHARACTER_FLAGS::kOnStairs))
         {
-            logger::trace("Character on stairs and stairs disables ledge check.");
+            logger::trace("Character on stairs and stairs disables ledge check."sv);
             return false;
         }
 
         const auto cell = actor->GetParentCell();
         if (!cell)
         {
-            logger::warn("Ledge check couldn't get parent cell");
+            logger::warn("Ledge check couldn't get parent cell"sv);
             return false;
         }
 
         const auto bhk_world = cell->GetbhkWorld();
         if (!bhk_world)
         {
-            logger::warn("Ledge check couldn't get bhkWorld");
+            logger::warn("Ledge check couldn't get bhkWorld"sv);
             return false;
         }
 
         const auto havok_world_scale = RE::bhkWorld::GetWorldScale();
         const float ray_length = 600.0f; // 600.0f
 
-        // const float maxStepUpHeight = 50.0f;   // not sure if this is working but I'm afraid to touch it
         const float direction_threshold = 0.7f; // Adjust for tighter/looser direction matching
         state.best_dist = -1.0f;
         RE::NiPoint3 actor_pos = actor->GetPosition();
@@ -304,10 +301,10 @@ namespace Utils
         auto &state = Globals::GetState(actor);
         if (!Globals::physical_blocker)
         {
-            // logger::trace("Checking for ledge.");
+            // logger::trace("Checking for ledge."sv);
             if (IsLedgeAhead(actor, state) && (state.is_attacking || state.is_on_ledge))
             {
-                // logger::trace("Stopping actor velocity.");
+                // logger::trace("Stopping actor velocity."sv);
                 StopActorVelocity(actor, state);
             }
         }

@@ -1,5 +1,3 @@
-namespace logger = SKSE::log;
-
 namespace Events
 {
     RE::BSEventNotifyControl CombatEventSink::ProcessEvent(
@@ -30,7 +28,7 @@ namespace Events
             if (state.ray_markers.empty() && Globals::show_markers)
                 Objects::InitializeRayMarkers(actor);
             actor->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
-            logger::debug("Tracking new combat actor: {}", actor->GetName());
+            logger::debug("Tracking new combat actor: {}"sv, actor->GetName());
         }
         else if (combatState == RE::ACTOR_COMBAT_STATE::kNone && Globals::g_actor_states.contains(formID))
         {
@@ -47,7 +45,7 @@ namespace Events
                 }
                 Globals::g_actor_states.erase(it);
                 actor->RemoveAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
-                logger::debug("Stopped tracking actor: {}", actor->GetName());
+                logger::debug("Stopped tracking actor: {}"sv, actor->GetName());
             }
         }
         Utils::CleanupActors();
@@ -79,8 +77,8 @@ namespace Events
         if (!stateCheck)
             return RE::BSEventNotifyControl::kContinue;
         auto &state = Globals::GetState(actor);
-        logger::trace("{} Payload: {}", holder_name, event->payload);
-        logger::trace("{} Tag: {}", holder_name, event->tag);
+        logger::trace("{} Payload: {}"sv, holder_name, event->payload.c_str());
+        logger::trace("{} Tag: {}"sv, holder_name, event->tag.c_str());
         if ((Globals::enable_for_attacks && event->tag == "PowerAttack_Start_end") ||
             (Globals::enable_for_dodges && (event->tag == "MCO_DodgeInitiate" ||
                                             event->tag == "RollTrigger" || event->tag == "SidestepTrigger" ||
@@ -88,10 +86,7 @@ namespace Events
             (Globals::enable_for_slides && event->tag == "SlideStart"))
         {
             state.is_attacking = true;
-            logger::debug("Animation Started for {}", holder_name);
-            if (!state.is_looping)
-                Utils::LoopEdgeCheck(actor);
-            state.is_looping = true;
+            logger::debug("Animation Started for {}"sv, holder_name);
             state.until_move_again = 0;
             state.until_moment_hide = 0;
             state.after_attack_timer = 0;
@@ -122,15 +117,14 @@ namespace Events
                   event->tag == "JumpUp" || event->tag == "MTstate"))
         {
             if (state.animation_type == 0)
-                logger::debug("Force ending LoopEdgeCheck");
+                logger::debug("Force ending LoopEdgeCheck"sv);
             state.animation_type = 0;
             state.is_attacking = false;
-            state.is_looping = false;
             state.moved_blocker = false;
             state.safe_grounded_positions.clear();
             if (Globals::physical_blocker)
                 state.ledge_blocker->SetPosition(state.ledge_blocker->GetPositionX(), state.ledge_blocker->GetPositionY(), -10000.0f);
-            logger::debug("Animation Finished for {}", holder_name);
+            logger::debug("Animation Finished for {}"sv, holder_name);
         }
         else if (!state.is_attacking && event->tag == "JumpUp")
         {

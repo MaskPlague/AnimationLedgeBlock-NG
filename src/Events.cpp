@@ -61,29 +61,29 @@ namespace Events
         const RE::BSAnimationGraphEvent *event,
         RE::BSTEventSource<RE::BSAnimationGraphEvent> *)
     {
-        if (!event || !event->holder)
-        {
-            return RE::BSEventNotifyControl::kStop;
-        }
+        if (!event || !event->holder || !event->holder->data.objectReference)
+            return RE::BSEventNotifyControl::kContinue;
+
         // Cast away constness
         auto refr = const_cast<RE::TESObjectREFR *>(event->holder);
-        auto actor = refr->As<RE::Actor>();
+        auto actor = refr ? refr->As<RE::Actor>() : nullptr;
         if (!actor)
-        {
             return RE::BSEventNotifyControl::kContinue;
-        }
-        auto holder_name = event->holder->GetName();
+
+        const char *holder_name = event->holder->GetName();
         Globals::ActorState *stateCheck = Globals::CheckState(actor);
         if (!stateCheck)
             return RE::BSEventNotifyControl::kContinue;
-        auto &state = Globals::GetState(actor);
-        logger::trace("{} Payload: {}"sv, holder_name, event->payload.c_str());
-        logger::trace("{} Tag: {}"sv, holder_name, event->tag.c_str());
-        if ((Globals::enable_for_attacks && event->tag == "PowerAttack_Start_end") ||
-            (Globals::enable_for_dodges && (event->tag == "MCO_DodgeInitiate" ||
-                                            event->tag == "RollTrigger" || event->tag == "SidestepTrigger" ||
-                                            event->tag == "TKDR_DodgeStart" || event->tag == "MCO_DisableSecondDodge")) ||
-            (Globals::enable_for_slides && event->tag == "SlideStart"))
+        Globals::ActorState &state = Globals::GetState(actor);
+        const RE::BSFixedString tag = event->tag;
+        const RE::BSFixedString payload = event->payload;
+        logger::trace("{} Payload: {}"sv, holder_name, payload.c_str());
+        logger::trace("{} Tag: {}"sv, holder_name, tag.c_str());
+        if ((Globals::enable_for_attacks && tag == "PowerAttack_Start_end") ||
+            (Globals::enable_for_dodges && (tag == "MCO_DodgeInitiate" ||
+                                            tag == "RollTrigger" || tag == "SidestepTrigger" ||
+                                            tag == "TKDR_DodgeStart" || tag == "MCO_DisableSecondDodge")) ||
+            (Globals::enable_for_slides && tag == "SlideStart"))
         {
             state.is_attacking = true;
             logger::debug("Animation Started for {}"sv, holder_name);
@@ -91,42 +91,40 @@ namespace Events
             state.until_moment_hide = 0;
             state.after_attack_timer = 0;
             state.safe_grounded_positions.clear();
-            if (event->tag == "PowerAttack_Start_end") // Any Attack
+            if (tag == "PowerAttack_Start_end") // Any Attack
                 state.animation_type = 1;
-            else if (event->tag == "MCO_DodgeInitiate") // DMCO
+            else if (tag == "MCO_DodgeInitiate") // DMCO
                 state.animation_type = 2;
-            else if (event->tag == "RollTrigger" || event->tag == "SidestepTrigger") // TUDMR
+            else if (tag == "RollTrigger" || tag == "SidestepTrigger") // TUDMR
                 state.animation_type = 3;
-            else if (event->tag == "TKDR_DodgeStart") // TK Dodge RE
+            else if (tag == "TKDR_DodgeStart") // TK Dodge RE
                 state.animation_type = 4;
-            else if (event->tag == "MCO_DisableSecondDodge") // Old DMCO
+            else if (tag == "MCO_DisableSecondDodge") // Old DMCO
                 state.animation_type = 5;
-            else if (event->tag == "SlideStart") // Crouch Sliding
+            else if (tag == "SlideStart") // Crouch Sliding
                 state.animation_type = 6;
         }
         else if (state.is_attacking &&
-                 ((state.animation_type == 1 && event->tag == "attackStop") ||
-                  (state.animation_type == 2 && event->payload == "$DMCO_Reset") ||
-                  (state.animation_type == 3 && event->tag == "RollStop") ||
-                  (state.animation_type == 4 && event->tag == "TKDR_DodgeEnd") ||
-                  (state.animation_type == 5 && event->tag == "EnableBumper") ||
-                  (state.animation_type == 6 && event->tag == "SlideStop") ||
+                 ((state.animation_type == 1 && tag == "attackStop") ||
+                  (state.animation_type == 2 && payload == "$DMCO_Reset") ||
+                  (state.animation_type == 3 && tag == "RollStop") ||
+                  (state.animation_type == 4 && tag == "TKDR_DodgeEnd") ||
+                  (state.animation_type == 5 && tag == "EnableBumper") ||
+                  (state.animation_type == 6 && tag == "SlideStop") ||
                   state.animation_type == 0 ||
-                  (state.animation_type != 1 && state.animation_type != 4 && event->tag == "InterruptCast") ||
-                  (state.animation_type != 4 && event->tag == "IdleStop") ||
-                  event->tag == "JumpUp" || event->tag == "MTstate"))
+                  (state.animation_type != 1 && state.animation_type != 4 && tag == "InterruptCast") ||
+                  (state.animation_type != 4 && tag == "IdleStop") ||
+                  tag == "JumpUp" || tag == "MTstate"))
         {
-            if (state.animation_type == 0)
-                logger::debug("Force ending LoopEdgeCheck"sv);
             state.animation_type = 0;
             state.is_attacking = false;
             state.moved_blocker = false;
             state.safe_grounded_positions.clear();
-            if (Globals::physical_blocker)
+            if (Globals::physical_blocker && state.ledge_blocker)
                 state.ledge_blocker->SetPosition(state.ledge_blocker->GetPositionX(), state.ledge_blocker->GetPositionY(), -10000.0f);
             logger::debug("Animation Finished for {}"sv, holder_name);
         }
-        else if (!state.is_attacking && event->tag == "JumpUp")
+        else if (!state.is_attacking && tag == "JumpUp")
         {
             state.jump_start = clock();
             state.is_jumping = true;

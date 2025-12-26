@@ -54,6 +54,7 @@ namespace Config
             logger::warn("Could not load AnimationLedgeBlockNG.ini, using defaults"sv);
         }
 
+        Globals::use_spell_toggle = ini.GetBoolValue("General", "UseTogglePower", false);
         Globals::physical_blocker = ini.GetBoolValue("General", "PhysicalBlocker", false);
         Globals::physical_blocker_type = ini.GetLongValue("General", "PhysicalBlockerType", 2);
         Globals::disable_on_stairs = ini.GetBoolValue("General", "DisableOnStairs", true);
@@ -77,6 +78,7 @@ namespace Config
         Globals::log_level = ini.GetLongValue("Debug", "LoggingLevel", 2);
 
         logger::debug("Version              {}"sv, SKSE::PluginDeclaration::GetSingleton()->GetVersion());
+        logger::debug("UseTogglePower:      {}"sv, Globals::use_spell_toggle);
         logger::debug("Physical Blocker:    {}"sv, Globals::physical_blocker);
         logger::debug("PhysicalBlockerType: {}"sv, Globals::physical_blocker_type);
         logger::debug("DisableOnStairs      {}"sv, Globals::disable_on_stairs);
@@ -91,6 +93,9 @@ namespace Config
         logger::debug("MemoryDuration:      {}"sv, Globals::memory_duration);
 
         logger::debug("LoggingLevel:        {}"sv, Globals::log_level);
+
+        ini.SetBoolValue("General", "UseTogglePower", Globals::use_spell_toggle,
+                         "#If enabled, gives the player a power to toggle on/off ledge blocking.");
 
         const char *physcialBlockerComment = ("#PhysicalBlocker: true means use the invisible collider mesh, false is teleport behavior"
                                               "\n#Collider doesn't cause jitter but allows the player to pass more easily"

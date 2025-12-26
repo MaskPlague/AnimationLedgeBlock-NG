@@ -10,8 +10,9 @@ namespace Globals
     extern bool enable_for_attacks;
     extern bool enable_for_dodges;
     extern bool enable_for_slides;
-    extern float drop_threshold; // 1.5x 1.0 player height
-    extern float ledge_distance; // 50.0 units around the player
+    extern bool use_spell_toggle;
+    extern float drop_threshold;
+    extern float ledge_distance; 
     extern float ground_leeway;
     extern int physical_blocker_type;
     extern int memory_duration;

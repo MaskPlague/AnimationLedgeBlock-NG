@@ -1,5 +1,55 @@
 namespace Utils
 {
+    int toggleSpellID = 0x804;
+    int deactivatorSpellID = 0x805;
+    const char *pluginName = "Animation Ledge Block NG.esp";
+
+    void AddTogglePowerToPlayer()
+    {
+        RE::TESDataHandler *handler = RE::TESDataHandler::GetSingleton();
+        RE::PlayerCharacter *player = RE::PlayerCharacter::GetSingleton();
+        if (!handler || !player)
+            return;
+        RE::SpellItem *togglePower = handler->LookupForm<RE::SpellItem>(toggleSpellID, pluginName);
+        if (!togglePower)
+            return;
+        if (!player->HasSpell(togglePower))
+            player->AddSpell(togglePower);
+    }
+
+    void RemoveSpellsFromPlayer()
+    {
+        RE::TESDataHandler *handler = RE::TESDataHandler::GetSingleton();
+        RE::PlayerCharacter *player = RE::PlayerCharacter::GetSingleton();
+        if (!handler || !player)
+            return;
+        RE::SpellItem *togglePower = handler->LookupForm<RE::SpellItem>(toggleSpellID, pluginName);
+        if (!togglePower)
+            return;
+        if (player->HasSpell(togglePower))
+            player->RemoveSpell(togglePower);
+        RE::SpellItem *deactivatorSpell = handler->LookupForm<RE::SpellItem>(deactivatorSpellID, pluginName);
+        if (!deactivatorSpell)
+            return;
+        if (player->HasSpell(deactivatorSpell))
+            player->RemoveSpell(deactivatorSpell);
+    }
+
+    bool PlayerHasDeactivatorSpell()
+    {
+        RE::TESDataHandler *handler = RE::TESDataHandler::GetSingleton();
+        RE::PlayerCharacter *player = RE::PlayerCharacter::GetSingleton();
+        if (!handler || !player)
+            return false;
+        RE::SpellItem *deactivatorSpell = handler->LookupForm<RE::SpellItem>(deactivatorSpellID, pluginName);
+        if (!deactivatorSpell)
+            return false;
+        if (player->HasSpell(deactivatorSpell))
+            return true;
+        else
+            return false;
+    }
+
     void CleanupActors()
     {
         for (auto it = Globals::g_actor_states.begin(); it != Globals::g_actor_states.end();)
@@ -72,7 +122,7 @@ namespace Utils
         }
         else
         {
-            if (!state.moved_blocker)
+            if (!state.moved_blocker && state.ledge_blocker)
             {
                 logger::trace("Moving a physical blocker to {}"sv, actor->GetName());
                 auto actor_pos = actor->GetPosition();

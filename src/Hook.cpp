@@ -33,7 +33,8 @@ namespace Hook
         if (internalCounter >= timeBetweenChecks)
         {
             internalCounter = 0.0f;
-            Utils::CheckAllActorsForLedges();
+            if (!Globals::use_spell_toggle || !Utils::PlayerHasDeactivatorSpell())
+                Utils::CheckAllActorsForLedges();
         }
         if (internalCleanCounter >= timeBetweenCleaning)
         {

@@ -25,6 +25,11 @@ namespace
                 Objects::InitializeRayMarkers(player);
             if (Globals::enable_for_npcs)
                 RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(Events::CombatEventSink::GetSingleton());
+            if (Globals::use_spell_toggle)
+                Utils::AddTogglePowerToPlayer();
+            else
+                Utils::RemoveSpellsFromPlayer();
+
             logger::info("Event Sink(s) Created"sv);
         }
         catch (...)

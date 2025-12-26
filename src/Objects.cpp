@@ -1,5 +1,7 @@
 namespace Objects
 {
+    const char *pluginName = "Animation Ledge Block NG.esp";
+
     bool CreateLedgeBlocker(RE::Actor *actor)
     {
         auto *handler = RE::TESDataHandler::GetSingleton();
@@ -12,21 +14,21 @@ namespace Objects
         switch (Globals::physical_blocker_type)
         {
         case 0: // Half Ring wall
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, pluginName);
             break;
         case 1: // Full Ring
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x801, "Animation Ledge Block NG.esp");
+            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x801, pluginName);
             break;
         case 2: // Shallow wall
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x802, "Animation Ledge Block NG.esp");
+            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x802, pluginName);
             break;
         default: // Default Half Ring wall
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, "Animation Ledge Block NG.esp");
+            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, pluginName);
         }
         logger::trace("using blocker type {}"sv, Globals::physical_blocker_type);
         if (!blocker)
         {
-            logger::warn("Could not access Animation Ledge Block NG.esp"sv);
+            logger::warn("Could not access {}"sv, pluginName);
             return true;
         }
         auto placed = actor->PlaceObjectAtMe(blocker, true);

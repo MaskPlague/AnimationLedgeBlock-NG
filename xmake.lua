@@ -21,6 +21,9 @@ add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 
+-- CommonlibSSE-NG v4.0.0+
+add_cxflags("/Zc:preprocessor")
+
 -- targets
 target("AnimationLedgeBlockNG")
     -- add dependencies to target

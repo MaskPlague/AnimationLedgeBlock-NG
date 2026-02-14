@@ -1,43 +1,5 @@
 namespace Objects
 {
-    const char *pluginName = "Animation Ledge Block NG.esp";
-
-    bool CreateLedgeBlocker(RE::Actor *actor)
-    {
-        auto *handler = RE::TESDataHandler::GetSingleton();
-        if (!handler || !actor)
-        {
-            logger::warn("Error, could not get TESDataHandler"sv);
-            return true;
-        }
-        RE::TESObjectSTAT *blocker;
-        switch (Globals::physical_blocker_type)
-        {
-        case 0: // Half Ring wall
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, pluginName);
-            break;
-        case 1: // Full Ring
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x801, pluginName);
-            break;
-        case 2: // Shallow wall
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x802, pluginName);
-            break;
-        default: // Default Half Ring wall
-            blocker = handler->LookupForm<RE::TESObjectSTAT>(0x800, pluginName);
-        }
-        logger::trace("using blocker type {}"sv, Globals::physical_blocker_type);
-        if (!blocker)
-        {
-            logger::warn("Could not access {}"sv, pluginName);
-            return true;
-        }
-        auto placed = actor->PlaceObjectAtMe(blocker, true);
-        placed->SetPosition(actor->GetPositionX(), actor->GetPositionY(), actor->GetPositionZ() - 10000);
-        auto &state = Globals::GetState(actor);
-        state.ledge_blocker = placed.get();
-        return false;
-    }
-
     // Call this once to spawn them near the actor
     void InitializeRayMarkers(RE::Actor *actor)
     {

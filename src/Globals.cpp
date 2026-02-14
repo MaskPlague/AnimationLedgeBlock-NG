@@ -2,7 +2,7 @@ namespace Globals
 {
     bool show_markers = false;
     int log_level = 2;
-    bool physical_blocker = false;
+    bool teleport = false;
     bool enable_for_npcs = true;
     bool disable_on_stairs = true;
     bool enable_for_attacks = true;
@@ -12,7 +12,6 @@ namespace Globals
     float drop_threshold = 150.0f; // 1.5x 1.0 player height
     float ledge_distance = 25.0f;  // 25.0 units around the player
     float ground_leeway = 90.0f;
-    int physical_blocker_type = 2;
     int memory_duration = 10;
     float jump_duration = 1.5f;
 

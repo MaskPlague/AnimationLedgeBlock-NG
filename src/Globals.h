@@ -4,7 +4,7 @@ namespace Globals
 {
     extern bool show_markers;
     extern int log_level;
-    extern bool physical_blocker;
+    extern bool teleport;
     extern bool enable_for_npcs;
     extern bool disable_on_stairs;
     extern bool enable_for_attacks;
@@ -12,9 +12,8 @@ namespace Globals
     extern bool enable_for_slides;
     extern bool use_spell_toggle;
     extern float drop_threshold;
-    extern float ledge_distance; 
+    extern float ledge_distance;
     extern float ground_leeway;
-    extern int physical_blocker_type;
     extern int memory_duration;
     extern float jump_duration;
 
@@ -27,16 +26,10 @@ namespace Globals
         bool is_on_ledge = false;
         int loops = 0;
         bool is_looping = false;
-        bool moved_blocker = false;
         bool has_event_sink = false;
 
         float best_yaw = 0.0f;
         float best_dist = -1.0f;
-
-        int until_move_again = 0;
-        int until_moment_hide = 0;
-
-        int after_attack_timer = 0;
 
         int animation_type = 0;
 

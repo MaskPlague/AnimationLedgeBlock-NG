@@ -17,10 +17,7 @@ namespace
             }
             else
                 logger::info("Player already has Event Sink"sv);
-            if (!state.ledge_blocker && Globals::physical_blocker)
-            {
-                Objects::CreateLedgeBlocker(player);
-            }
+
             if (state.ray_markers.empty() && Globals::show_markers)
                 Objects::InitializeRayMarkers(player);
             if (Globals::enable_for_npcs)

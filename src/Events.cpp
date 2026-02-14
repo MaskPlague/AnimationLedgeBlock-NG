@@ -21,10 +21,6 @@ namespace Events
         if (combatState == RE::ACTOR_COMBAT_STATE::kCombat && !Globals::g_actor_states.contains(formID))
         {
             auto &state = Globals::g_actor_states[formID];
-            if (!state.ledge_blocker && Globals::physical_blocker)
-            {
-                Objects::CreateLedgeBlocker(actor);
-            }
             if (state.ray_markers.empty() && Globals::show_markers)
                 Objects::InitializeRayMarkers(actor);
             actor->AddAnimationGraphEventSink(AttackAnimationGraphEventSink::GetSingleton());
@@ -87,9 +83,6 @@ namespace Events
         {
             state.is_attacking = true;
             logger::debug("Animation Started for {}"sv, holder_name);
-            state.until_move_again = 0;
-            state.until_moment_hide = 0;
-            state.after_attack_timer = 0;
             state.safe_grounded_positions.clear();
             if (tag == "PowerAttack_Start_end") // Any Attack
                 state.animation_type = 1;
@@ -118,10 +111,7 @@ namespace Events
         {
             state.animation_type = 0;
             state.is_attacking = false;
-            state.moved_blocker = false;
-            state.safe_grounded_positions.clear();
-            if (Globals::physical_blocker && state.ledge_blocker)
-                state.ledge_blocker->SetPosition(state.ledge_blocker->GetPositionX(), state.ledge_blocker->GetPositionY(), -10000.0f);
+            state.is_on_ledge = false;
             logger::debug("Animation Finished for {}"sv, holder_name);
         }
         else if (!state.is_attacking && tag == "JumpUp")

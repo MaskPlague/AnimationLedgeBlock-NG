@@ -69,19 +69,6 @@ namespace Utils
         }
     }
 
-    // Taken from Better Grabbing
-    void SetAngle(RE::TESObjectREFR *ref, const RE::NiPoint3 &a_position)
-    {
-        if (!ref)
-        {
-            return;
-        }
-        using func_t = void(RE::TESObjectREFR *, const RE::NiPoint3 &);
-        const REL::Relocation<func_t> func{RELOCATION_ID(19359, 19786)};
-        return func(ref, a_position);
-    }
-    //----------------------------
-
     // Force the actor to stop moving toward their original vector
     void StopActorVelocity(RE::Actor *actor, Globals::ActorState &state)
     {
@@ -122,18 +109,10 @@ namespace Utils
         }
         else
         {
-            if (!state.moved_blocker && state.ledge_blocker)
-            {
-                logger::trace("Moving a physical blocker to {}"sv, actor->GetName());
-                auto actor_pos = actor->GetPosition();
-                RE::NiPoint3 obj_dir(std::sin(state.best_yaw), std::cos(state.best_yaw), 0.0f);
-                obj_dir.Unitize();
-                RE::NiPoint3 obj_pos = actor_pos - (obj_dir * 10.0f);
-                state.ledge_blocker->SetPosition(obj_pos.x, obj_pos.y, actor_pos.z + 60);
-                state.moved_blocker = true;
-                SetAngle(state.ledge_blocker, {0.0f, 0.0f, state.best_yaw});
-                state.ledge_blocker->Update3DPosition(true);
-            }
+            const RE::NiPoint3 pos = actor->GetPosition();
+            const RE::NiPoint3 dir_vec(std::sin(state.best_yaw), std::cos(state.best_yaw), 0.0f);
+            const RE::NiPoint3 back_pos = pos - (dir_vec * 4.0f);
+            actor->SetPosition(back_pos, true);
         }
     }
 
@@ -290,10 +269,6 @@ namespace Utils
                     valid_yaws.push_back(yaw);
                 }
             }
-            else if (Globals::physical_blocker)
-            {
-                valid_yaws.push_back(yaw);
-            }
             else
             {
                 if (opposite_dir)
@@ -326,31 +301,11 @@ namespace Utils
         return ledge_detected;
     }
 
-    void CellChangeCheck(RE::Actor *actor)
-    {
-        if (const Globals::ActorState *state_check = Globals::CheckState(actor); !state_check)
-            return;
-        auto &state = Globals::GetState(actor);
-        if (!Globals::physical_blocker || !actor || !state.ledge_blocker || !state.ledge_blocker->GetParentCell())
-            return;
-
-        if (auto *current_cell = actor->GetParentCell(); current_cell != state.last_actor_cell)
-        {
-            state.last_actor_cell = current_cell;
-            if (state.ledge_blocker)
-            {
-                state.ledge_blocker->SetParentCell(current_cell);
-                state.ledge_blocker->SetPosition(actor->GetPositionX(), actor->GetPositionY(), actor->GetPositionZ() - 10000.0f);
-            }
-        }
-    }
-
     void EdgeCheck(RE::Actor *actor, Globals::ActorState &state)
     {
         Globals::ActorState *stateCheck = Globals::CheckState(actor);
         if (!stateCheck || !actor)
             return;
-        if (!Globals::physical_blocker)
         {
             // logger::trace("Checking for ledge."sv);
             if (IsLedgeAhead(actor, state) && (state.is_attacking || state.is_on_ledge))
@@ -359,28 +314,6 @@ namespace Utils
                 StopActorVelocity(actor, state);
             }
         }
-        else
-        {
-            if (IsLedgeAhead(actor, state) && state.is_attacking)
-            {
-                ++state.until_move_again;
-                StopActorVelocity(actor, state);
-            }
-            else if (state.is_attacking)
-                ++state.until_move_again;
-
-            if (state.until_move_again > 50)
-            {
-                state.until_move_again = 0;
-                state.moved_blocker = false;
-                ++state.until_moment_hide;
-            }
-            if (state.until_moment_hide > 3)
-            {
-                state.until_moment_hide = 0;
-                state.moved_blocker = false;
-                state.ledge_blocker->SetPosition(state.ledge_blocker->GetPositionX(), state.ledge_blocker->GetPositionY(), -10000.0f);
-            }
         }
     }
 
@@ -400,14 +333,6 @@ namespace Utils
 
             if (state.is_attacking || state.is_on_ledge)
             {
-                if (!state.is_attacking && state.is_on_ledge)
-                    ++state.after_attack_timer;
-                if (!state.is_attacking && state.is_on_ledge && state.after_attack_timer > 25)
-                {
-                    state.after_attack_timer = 0;
-                    continue;
-                }
-                CellChangeCheck(actor_ptr);
                 EdgeCheck(actor_ptr, state);
             }
         }

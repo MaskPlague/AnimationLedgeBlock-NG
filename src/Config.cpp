@@ -55,8 +55,7 @@ namespace Config
         }
 
         Globals::use_spell_toggle = ini.GetBoolValue("General", "UseTogglePower", false);
-        Globals::physical_blocker = ini.GetBoolValue("General", "PhysicalBlocker", false);
-        Globals::physical_blocker_type = ini.GetLongValue("General", "PhysicalBlockerType", 2);
+        Globals::teleport = ini.GetBoolValue("General", "Teleport", true);
         Globals::disable_on_stairs = ini.GetBoolValue("General", "DisableOnStairs", true);
         Globals::enable_for_npcs = ini.GetBoolValue("General", "EnableNPCs", true);
         Globals::enable_for_attacks = ini.GetBoolValue("General", "EnableAttackBlocking", true);
@@ -66,10 +65,6 @@ namespace Config
         if (Globals::drop_threshold > 600.0f)
             Globals::drop_threshold = 590.0f;
         Globals::ledge_distance = static_cast<float>(ini.GetDoubleValue("Tweaks", "LedgeDistance", 25.0f));
-        if (Globals::physical_blocker && Globals::ledge_distance < 50.0f)
-            Globals::ledge_distance = 50.0f;
-        else if (!Globals::physical_blocker && Globals::ledge_distance < 10.0f)
-            Globals::ledge_distance = 10.0f;
         Globals::ground_leeway = static_cast<float>(ini.GetDoubleValue("Tweaks", "GroundLeeway", 90.0f));
         Globals::jump_duration = static_cast<float>(ini.GetDoubleValue("Tweaks", "JumpDuration", Globals::jump_duration));
         Globals::memory_duration = ini.GetLongValue("Tweaks", "MemoryDuration", 10);
@@ -79,8 +74,7 @@ namespace Config
 
         logger::debug("Version              {}"sv, SKSE::PluginDeclaration::GetSingleton()->GetVersion());
         logger::debug("UseTogglePower:      {}"sv, Globals::use_spell_toggle);
-        logger::debug("Physical Blocker:    {}"sv, Globals::physical_blocker);
-        logger::debug("PhysicalBlockerType: {}"sv, Globals::physical_blocker_type);
+        logger::debug("Teleport:            {}"sv, Globals::teleport);
         logger::debug("DisableOnStairs      {}"sv, Globals::disable_on_stairs);
         logger::debug("EnableNPCs:          {}"sv, Globals::enable_for_npcs);
         logger::debug("EnableAttackBlocking:{}"sv, Globals::enable_for_attacks);
@@ -97,18 +91,12 @@ namespace Config
         ini.SetBoolValue("General", "UseTogglePower", Globals::use_spell_toggle,
                          "#If enabled, gives the player a power to toggle on/off ledge blocking.");
 
-        const char *physcialBlockerComment = ("#PhysicalBlocker: true means use the invisible collider mesh, false is teleport behavior"
-                                              "\n#Collider doesn't cause jitter but allows the player to pass more easily"
-                                              "\n#Teleport causes jitter but is smoother in most other ways ");
-        ini.SetBoolValue("General", "PhysicalBlocker", Globals::physical_blocker, physcialBlockerComment);
-
-        const char *physcialBlockerTypeComment = ("#0 = Half Ring Wall, half a tall ring"
-                                                  "\n# 1 = Full Ring, a ring around the player"
-                                                  "\n# 2 = Shallow Wall, basically a shallow ^ shape");
-        ini.SetLongValue("General", "PhysicalBlockerType", Globals::physical_blocker_type, physcialBlockerTypeComment);
+        const char *teleportComment = ("#Teleports the actor back to the last place they were not on a ledge."
+                                       "\n#Prevents very fast animations from breaking free from ledges.");
+        ini.SetBoolValue("General", "Teleport", Globals::teleport, teleportComment);
 
         const char *stairsComment = ("#Disable the ledge block while on stairs, this prevents rolling/attacking down stairs from being interfered with. Default true."
-                                     "\n#Some stairs are not line of sight blocking(and therefore don 't get hit by this mod' s ray - casts) and don't play well with this mod.");
+                                     "\n#Some stairs are not line of sight blocking (and therefore don't get hit by this mod's ray casts) and don't play well with this mod.");
         ini.SetBoolValue("General", "DisableOnStairs", Globals::disable_on_stairs, stairsComment);
 
         ini.SetBoolValue("General", "EnableNPCs", Globals::enable_for_npcs, "#Enable ledge blocking for NPCs, default true.");
@@ -120,9 +108,7 @@ namespace Config
                                             "\n#Max of 600.0, ray - casts of 600.0 are automatically considered as a ledge.");
         ini.SetDoubleValue("Tweaks", "DropThreshold", static_cast<double>(Globals::drop_threshold), dropThresholdComment);
 
-        const char *ledgeDistanceComment = ("#How far should a ledge be detected. Default 25.0"
-                                            "\n# 10.0 min for teleporting(less looks better, but will put you closer to the ledge with potential to slip past)"
-                                            "\n# 50.0 min for physical(too little and it won't detect fast enough)");
+        const char *ledgeDistanceComment = ("#How far should a ledge be detected. Default 25.0");
         ini.SetDoubleValue("Tweaks", "LedgeDistance", static_cast<double>(Globals::ledge_distance), ledgeDistanceComment);
 
         ini.SetDoubleValue("Tweaks", "JumpDuration", Globals::jump_duration,
@@ -130,8 +116,8 @@ namespace Config
         ini.SetDoubleValue("Tweaks", "GroundLeeway", static_cast<double>(Globals::ground_leeway),
                            "#How far the player should be off the ground before ledge detection shuts off. Default 90.0");
 
-        const char *memoryDurationComment = ("#This stops the ledge detection from cutting off too early and dropping the player off a ledge."
-                                             "\n#Each check is 11 milliseconds apart, default remembers for 10 checks.");
+        const char *memoryDurationComment = ("#This stops the ledge detection from cutting off too early and dropping the actor off a ledge."
+                                             "\n#Each check is ~11 milliseconds apart, default remembers for 10 checks.");
         ini.SetLongValue("Tweaks", "MemoryDuration", Globals::memory_duration, memoryDurationComment);
 
         ini.SetLongValue("Debug", "LoggingLevel", Globals::log_level,

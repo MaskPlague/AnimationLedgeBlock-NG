@@ -70,7 +70,7 @@ namespace Utils
     }
 
     // Force the actor to stop moving toward their original vector
-    void StopActorVelocity(RE::Actor *actor, Globals::ActorState &state)
+    void MoveActorToSafePoint(RE::Actor *actor, Globals::ActorState &state)
     {
         Globals::ActorState *stateCheck = Globals::CheckState(actor);
         if (!stateCheck || !actor)
@@ -83,31 +83,22 @@ namespace Utils
         }
 
         controller->SetLinearVelocityImpl({0.0f, 0.0f, 0.0f, 0.0f});
-        if (!Globals::physical_blocker)
+
+        logger::trace("Moving actor {} to safe point"sv, actor->GetName());
+
+        bool teleported = false;
+        if (!state.safe_grounded_positions.empty())
         {
-            if (Globals::log_level > 2)
-                logger::trace("Teleportation blocking {}"sv, actor->GetName());
-            bool teleported = false;
-            if (!state.safe_grounded_positions.empty())
+            auto back_pos = state.safe_grounded_positions.back();
+            auto actor_pos = actor->GetPosition();
+            float distance = actor_pos.GetDistance(back_pos);
+            if (distance <= 10.0f)
             {
-                auto back_pos = state.safe_grounded_positions.back();
-                auto actor_pos = actor->GetPosition();
-                auto distance = std::sqrt(pow(back_pos.x - actor_pos.x, 2) + pow(back_pos.y - actor_pos.y, 2) + pow(back_pos.z - actor_pos.z, 2));
-                if (distance <= 10.0f)
-                {
-                    actor->SetPosition(back_pos, true);
-                    teleported = true;
-                }
-            }
-            if (!teleported)
-            {
-                const RE::NiPoint3 pos = actor->GetPosition();
-                const RE::NiPoint3 dir_vec(std::sin(state.best_yaw), std::cos(state.best_yaw), 0.0f);
-                const RE::NiPoint3 back_pos = pos - (dir_vec * 4.0f);
                 actor->SetPosition(back_pos, true);
+                teleported = true;
             }
         }
-        else
+        if (!teleported)
         {
             const RE::NiPoint3 pos = actor->GetPosition();
             const RE::NiPoint3 dir_vec(std::sin(state.best_yaw), std::cos(state.best_yaw), 0.0f);
@@ -306,20 +297,19 @@ namespace Utils
         Globals::ActorState *stateCheck = Globals::CheckState(actor);
         if (!stateCheck || !actor)
             return;
+        // logger::trace("Checking for ledge."sv);
+        if (IsLedgeAhead(actor, state) && (state.is_attacking || state.is_on_ledge))
         {
-            // logger::trace("Checking for ledge."sv);
-            if (IsLedgeAhead(actor, state) && (state.is_attacking || state.is_on_ledge))
-            {
-                // logger::trace("Stopping actor velocity."sv);
-                StopActorVelocity(actor, state);
-            }
-        }
+            // logger::trace("Stopping actor velocity."sv);
+            // Teleport actor to last safe point on ledge, helps with very fast animations like lunges.
+            if (Globals::teleport)
+                MoveActorToSafePoint(actor, state);
         }
     }
 
     void CheckAllActorsForLedges()
     {
-        for (auto actor_state : Globals::g_actor_states)
+        for (std::pair<const RE::FormID, Globals::ActorState &> actor_state : Globals::g_actor_states)
         {
             auto form_id = actor_state.first;
             auto actor_ptr = RE::TESForm::LookupByID<RE::Actor>(form_id);

@@ -6,7 +6,7 @@ includes("lib/commonlibsse-ng")
 
 -- set project
 set_project("AnimationLedgeBlockNG")
-set_version("0.2.15")
+set_version("0.3.0")
 set_license("MIT")
 
 -- set defaults

@@ -75,7 +75,7 @@ namespace Hook
         if (stateCheck)
         {
             Globals::ActorState &state = Globals::GetState(a_character);
-            if (state.is_on_ledge && state.is_attacking)
+            if (state.is_on_ledge)
             {
                 a_translation->x = 0.0f;
                 a_translation->y = 0.0f;

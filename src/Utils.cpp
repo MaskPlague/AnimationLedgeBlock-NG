@@ -92,9 +92,10 @@ namespace Utils
             auto back_pos = state.safe_grounded_positions.back();
             auto actor_pos = actor->GetPosition();
             float distance = actor_pos.GetDistance(back_pos);
-            if (distance <= 10.0f)
+            if (distance <= Globals::valid_safe_point_distance)
             {
-                actor->SetPosition(back_pos, true);
+                if (distance > 3.0f)
+                    actor->SetPosition(back_pos, true);
                 teleported = true;
             }
         }
@@ -146,7 +147,6 @@ namespace Utils
         const float ray_length = 600.0f; // 600.0f
 
         const float direction_threshold = 0.7f; // Adjust for tighter/looser direction matching
-        state.best_dist = -1.0f;
         RE::NiPoint3 actor_pos = actor->GetPosition();
         RE::NiPoint3 current_linear_velocity;
         actor->GetLinearVelocity(current_linear_velocity);

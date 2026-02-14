@@ -5,6 +5,7 @@ namespace Globals
     extern bool show_markers;
     extern int log_level;
     extern bool teleport;
+    extern float valid_safe_point_distance;
     extern bool enable_for_npcs;
     extern bool disable_on_stairs;
     extern bool enable_for_attacks;
@@ -29,7 +30,6 @@ namespace Globals
         bool has_event_sink = false;
 
         float best_yaw = 0.0f;
-        float best_dist = -1.0f;
 
         int animation_type = 0;
 

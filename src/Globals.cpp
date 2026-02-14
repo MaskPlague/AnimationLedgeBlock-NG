@@ -2,7 +2,8 @@ namespace Globals
 {
     bool show_markers = false;
     int log_level = 2;
-    bool teleport = false;
+    bool teleport = true;
+    float valid_safe_point_distance = 10.0f;
     bool enable_for_npcs = true;
     bool disable_on_stairs = true;
     bool enable_for_attacks = true;

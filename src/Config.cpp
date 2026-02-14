@@ -54,46 +54,50 @@ namespace Config
             logger::warn("Could not load AnimationLedgeBlockNG.ini, using defaults"sv);
         }
 
-        Globals::use_spell_toggle = ini.GetBoolValue("General", "UseTogglePower", false);
-        Globals::teleport = ini.GetBoolValue("General", "Teleport", true);
-        Globals::disable_on_stairs = ini.GetBoolValue("General", "DisableOnStairs", true);
-        Globals::enable_for_npcs = ini.GetBoolValue("General", "EnableNPCs", true);
-        Globals::enable_for_attacks = ini.GetBoolValue("General", "EnableAttackBlocking", true);
-        Globals::enable_for_dodges = ini.GetBoolValue("General", "EnableDodgeBlocking", true);
-        Globals::enable_for_slides = ini.GetBoolValue("General", "EnableSlideBlocking", true);
-        Globals::drop_threshold = static_cast<float>(ini.GetDoubleValue("Tweaks", "DropThreshold", 150.0f));
+        Globals::use_spell_toggle = ini.GetBoolValue("General", "UseTogglePower", Globals::use_spell_toggle);
+
+        Globals::disable_on_stairs = ini.GetBoolValue("General", "DisableOnStairs", Globals::disable_on_stairs);
+        Globals::enable_for_npcs = ini.GetBoolValue("General", "EnableNPCs", Globals::enable_for_npcs);
+        Globals::enable_for_attacks = ini.GetBoolValue("General", "EnableAttackBlocking", Globals::enable_for_attacks);
+        Globals::enable_for_dodges = ini.GetBoolValue("General", "EnableDodgeBlocking", Globals::enable_for_dodges);
+        Globals::enable_for_slides = ini.GetBoolValue("General", "EnableSlideBlocking", Globals::enable_for_slides);
+
+        Globals::teleport = ini.GetBoolValue("Tweaks", "Teleport", Globals::teleport);
+        Globals::valid_safe_point_distance = static_cast<float>(ini.GetDoubleValue("Tweaks", "ValidSafePointDistance", Globals::valid_safe_point_distance));
+
+        Globals::drop_threshold = static_cast<float>(ini.GetDoubleValue("Tweaks", "DropThreshold", Globals::drop_threshold));
         if (Globals::drop_threshold > 600.0f)
             Globals::drop_threshold = 590.0f;
-        Globals::ledge_distance = static_cast<float>(ini.GetDoubleValue("Tweaks", "LedgeDistance", 25.0f));
-        Globals::ground_leeway = static_cast<float>(ini.GetDoubleValue("Tweaks", "GroundLeeway", 90.0f));
+        Globals::ledge_distance = static_cast<float>(ini.GetDoubleValue("Tweaks", "LedgeDistance", Globals::ledge_distance));
+        Globals::ground_leeway = static_cast<float>(ini.GetDoubleValue("Tweaks", "GroundLeeway", Globals::ground_leeway));
         Globals::jump_duration = static_cast<float>(ini.GetDoubleValue("Tweaks", "JumpDuration", Globals::jump_duration));
-        Globals::memory_duration = ini.GetLongValue("Tweaks", "MemoryDuration", 10);
+        Globals::memory_duration = ini.GetLongValue("Tweaks", "MemoryDuration", Globals::memory_duration);
         Globals::memory_duration = std::max(Globals::memory_duration, 1);
 
         Globals::log_level = ini.GetLongValue("Debug", "LoggingLevel", 2);
 
-        logger::debug("Version              {}"sv, SKSE::PluginDeclaration::GetSingleton()->GetVersion());
-        logger::debug("UseTogglePower:      {}"sv, Globals::use_spell_toggle);
-        logger::debug("Teleport:            {}"sv, Globals::teleport);
-        logger::debug("DisableOnStairs      {}"sv, Globals::disable_on_stairs);
-        logger::debug("EnableNPCs:          {}"sv, Globals::enable_for_npcs);
-        logger::debug("EnableAttackBlocking:{}"sv, Globals::enable_for_attacks);
-        logger::debug("EnableDodgeBlocking: {}"sv, Globals::enable_for_dodges);
-        logger::debug("EnableSlideBlocking: {}"sv, Globals::enable_for_slides);
-        logger::debug("DropThreshold:       {:.2f}"sv, Globals::drop_threshold);
-        logger::debug("LedgeDistance:       {:.2f}"sv, Globals::ledge_distance);
-        logger::debug("JumpDuration         {:.2f}"sv, Globals::jump_duration);
-        logger::debug("GroundLeeway         {:.2f}"sv, Globals::ground_leeway);
-        logger::debug("MemoryDuration:      {}"sv, Globals::memory_duration);
+        logger::debug("Version                  {}"sv, SKSE::PluginDeclaration::GetSingleton()->GetVersion());
+        logger::debug("UseTogglePower:          {}"sv, Globals::use_spell_toggle);
 
-        logger::debug("LoggingLevel:        {}"sv, Globals::log_level);
+        logger::debug("DisableOnStairs          {}"sv, Globals::disable_on_stairs);
+        logger::debug("EnableNPCs:              {}"sv, Globals::enable_for_npcs);
+        logger::debug("EnableAttackBlocking:    {}"sv, Globals::enable_for_attacks);
+        logger::debug("EnableDodgeBlocking:     {}"sv, Globals::enable_for_dodges);
+        logger::debug("EnableSlideBlocking:     {}"sv, Globals::enable_for_slides);
+
+        logger::debug("Teleport:                {}"sv, Globals::teleport);
+        logger::debug("ValidSafePointDistance:  {:.2f}"sv, Globals::valid_safe_point_distance);
+
+        logger::debug("DropThreshold:           {:.2f}"sv, Globals::drop_threshold);
+        logger::debug("LedgeDistance:           {:.2f}"sv, Globals::ledge_distance);
+        logger::debug("JumpDuration             {:.2f}"sv, Globals::jump_duration);
+        logger::debug("GroundLeeway             {:.2f}"sv, Globals::ground_leeway);
+        logger::debug("MemoryDuration:          {}"sv, Globals::memory_duration);
+
+        logger::debug("LoggingLevel:            {}"sv, Globals::log_level);
 
         ini.SetBoolValue("General", "UseTogglePower", Globals::use_spell_toggle,
                          "#If enabled, gives the player a power to toggle on/off ledge blocking.");
-
-        const char *teleportComment = ("#Teleports the actor back to the last place they were not on a ledge."
-                                       "\n#Prevents very fast animations from breaking free from ledges.");
-        ini.SetBoolValue("General", "Teleport", Globals::teleport, teleportComment);
 
         const char *stairsComment = ("#Disable the ledge block while on stairs, this prevents rolling/attacking down stairs from being interfered with. Default true."
                                      "\n#Some stairs are not line of sight blocking (and therefore don't get hit by this mod's ray casts) and don't play well with this mod.");
@@ -104,8 +108,16 @@ namespace Config
         ini.SetBoolValue("General", "EnableDodgeBlocking", Globals::enable_for_dodges, "#Enable ledge blocking for DMCO/TUDM/TK dodges");
         ini.SetBoolValue("General", "EnableSlideBlocking", Globals::enable_for_slides, "#Enable ledge blocking for Crouch Slide");
 
+        const char *teleportComment = ("#Teleports the actor back to the last place that they were not on a ledge. Disabling is not advised."
+                                       "\n#Prevents very fast animations from breaking free from ledges. Default Enabled.");
+        ini.SetBoolValue("Tweaks", "Teleport", Globals::teleport, teleportComment);
+
+        const char *validSafePointComment = ("#If Teleport is enabled, when an actor is detected as on a ledge, this is how far a safe point can be from the actor and be a valid"
+                                             "\n#teleport target. This prevents an actor from being teleported to a point on the ledge that is far from their current position. Default is 10.0");
+        ini.SetDoubleValue("Tweaks", "ValidSafePointDistance", static_cast<double>(Globals::valid_safe_point_distance), validSafePointComment);
+
         const char *dropThresholdComment = ("#How far the raycast needs to go before it is considered a drop 150.0 = 1.5x default player height"
-                                            "\n#Max of 600.0, ray - casts of 600.0 are automatically considered as a ledge.");
+                                            "\n#Max of 600.0, ray casts of 600.0 are automatically considered as a ledge.");
         ini.SetDoubleValue("Tweaks", "DropThreshold", static_cast<double>(Globals::drop_threshold), dropThresholdComment);
 
         const char *ledgeDistanceComment = ("#How far should a ledge be detected. Default 25.0");

@@ -8,20 +8,19 @@ namespace
             Globals::g_actor_states.clear();
             const auto player = RE::PlayerCharacter::GetSingleton();
             player->RemoveAnimationGraphEventSink(Events::AttackAnimationGraphEventSink::GetSingleton());
+            logger::info("Creating Player Event Sink"sv);
+            player->AddAnimationGraphEventSink(Events::AttackAnimationGraphEventSink::GetSingleton());
+
             auto &state = Globals::g_actor_states[player->GetFormID()];
-            if (!state.has_event_sink)
-            {
-                logger::info("Creating Player Event Sink"sv);
-                player->AddAnimationGraphEventSink(Events::AttackAnimationGraphEventSink::GetSingleton());
-                state.has_event_sink = true;
-            }
-            else
-                logger::info("Player already has Event Sink"sv);
 
             if (state.ray_markers.empty() && Globals::show_markers)
                 Objects::InitializeRayMarkers(player);
             if (Globals::enable_for_npcs)
+            {
+                logger::info("Creating Combat Event Sink"sv);
+                RE::ScriptEventSourceHolder::GetSingleton()->RemoveEventSink(Events::CombatEventSink::GetSingleton());
                 RE::ScriptEventSourceHolder::GetSingleton()->AddEventSink(Events::CombatEventSink::GetSingleton());
+            }
             if (Globals::use_spell_toggle)
                 Utils::AddTogglePowerToPlayer();
             else

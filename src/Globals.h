@@ -27,7 +27,6 @@ namespace Globals
         bool is_on_ledge = false;
         int loops = 0;
         bool is_looping = false;
-        bool has_event_sink = false;
 
         float best_yaw = 0.0f;
 

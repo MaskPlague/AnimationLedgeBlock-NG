@@ -41,7 +41,7 @@ namespace MathUtils
             min = std::min(min, z);
         }
         auto diff = max - min;
-        logger::trace("Diff {}"sv, diff);
+        // logger::trace("Diff {}"sv, diff);
         if (diff >= Globals::drop_threshold)
             return true;
         else

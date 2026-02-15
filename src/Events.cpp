@@ -53,7 +53,7 @@ namespace Events
         return &singleton;
     }
 
-    bool IsAnimationStart(const RE::BSFixedString tag, const RE::BSFixedString payload)
+    bool IsAnimationStart(const RE::BSFixedString tag)
     {
         if (Globals::enable_for_attacks && tag == "PowerAttack_Start_end")
             return true;
@@ -95,7 +95,8 @@ namespace Events
             return RE::BSEventNotifyControl::kContinue;
 
         // Get actor as non-const
-        RE::Actor *actor = event->holder->data.objectReference->As<RE::Actor>();
+        RE::TESObjectREFR *refr = const_cast<RE::TESObjectREFR *>(event->holder);
+        RE::Actor *actor = refr ? refr->As<RE::Actor>() : nullptr;
         if (!actor)
             return RE::BSEventNotifyControl::kContinue;
 
@@ -108,7 +109,7 @@ namespace Events
         const RE::BSFixedString payload = event->payload;
         logger::trace("{} Payload: {}"sv, holder_name, payload.c_str());
         logger::trace("{} Tag: {}"sv, holder_name, tag.c_str());
-        if (IsAnimationStart(tag, payload))
+        if (IsAnimationStart(tag))
         {
             state.is_attacking = true;
             logger::debug("Animation Started for {}"sv, holder_name);

@@ -53,6 +53,40 @@ namespace Events
         return &singleton;
     }
 
+    bool IsAnimationStart(const RE::BSFixedString tag, const RE::BSFixedString payload)
+    {
+        if (Globals::enable_for_attacks && tag == "PowerAttack_Start_end")
+            return true;
+        if (Globals::enable_for_dodges && (tag == "MCO_DodgeInitiate" ||
+                                           tag == "RollTrigger" || tag == "SidestepTrigger" ||
+                                           tag == "TKDR_DodgeStart" || tag == "MCO_DisableSecondDodge"))
+            return true;
+        if (Globals::enable_for_slides && tag == "SlideStart")
+            return true;
+        return false;
+    }
+
+    bool IsAnimationEnd(Globals::ActorState state, const RE::BSFixedString tag, const RE::BSFixedString payload)
+    {
+        if (!state.is_attacking)
+            return false;
+        if ((state.animation_type == 1 && tag == "attackStop") ||
+            (state.animation_type == 2 && payload == "$DMCO_Reset") ||
+            (state.animation_type == 3 && tag == "RollStop") ||
+            (state.animation_type == 4 && tag == "TKDR_DodgeEnd") ||
+            (state.animation_type == 5 && tag == "EnableBumper") ||
+            (state.animation_type == 6 && tag == "SlideStop") ||
+            state.animation_type == 0)
+            return true;
+        if (state.animation_type != 1 && state.animation_type != 4 && tag == "InterruptCast")
+            return true;
+        if (state.animation_type != 4 && tag == "IdleStop")
+            return true;
+        if (tag == "JumpUp" || tag == "MTstate")
+            return true;
+        return false;
+    }
+
     RE::BSEventNotifyControl AttackAnimationGraphEventSink::ProcessEvent(
         const RE::BSAnimationGraphEvent *event,
         RE::BSTEventSource<RE::BSAnimationGraphEvent> *)
@@ -60,9 +94,8 @@ namespace Events
         if (!event || !event->holder || !event->holder->data.objectReference)
             return RE::BSEventNotifyControl::kContinue;
 
-        // Cast away constness
-        auto refr = const_cast<RE::TESObjectREFR *>(event->holder);
-        auto actor = refr ? refr->As<RE::Actor>() : nullptr;
+        // Get actor as non-const
+        RE::Actor *actor = event->holder->data.objectReference->As<RE::Actor>();
         if (!actor)
             return RE::BSEventNotifyControl::kContinue;
 
@@ -75,11 +108,7 @@ namespace Events
         const RE::BSFixedString payload = event->payload;
         logger::trace("{} Payload: {}"sv, holder_name, payload.c_str());
         logger::trace("{} Tag: {}"sv, holder_name, tag.c_str());
-        if ((Globals::enable_for_attacks && tag == "PowerAttack_Start_end") ||
-            (Globals::enable_for_dodges && (tag == "MCO_DodgeInitiate" ||
-                                            tag == "RollTrigger" || tag == "SidestepTrigger" ||
-                                            tag == "TKDR_DodgeStart" || tag == "MCO_DisableSecondDodge")) ||
-            (Globals::enable_for_slides && tag == "SlideStart"))
+        if (IsAnimationStart(tag, payload))
         {
             state.is_attacking = true;
             logger::debug("Animation Started for {}"sv, holder_name);
@@ -97,17 +126,7 @@ namespace Events
             else if (tag == "SlideStart") // Crouch Sliding
                 state.animation_type = 6;
         }
-        else if (state.is_attacking &&
-                 ((state.animation_type == 1 && tag == "attackStop") ||
-                  (state.animation_type == 2 && payload == "$DMCO_Reset") ||
-                  (state.animation_type == 3 && tag == "RollStop") ||
-                  (state.animation_type == 4 && tag == "TKDR_DodgeEnd") ||
-                  (state.animation_type == 5 && tag == "EnableBumper") ||
-                  (state.animation_type == 6 && tag == "SlideStop") ||
-                  state.animation_type == 0 ||
-                  (state.animation_type != 1 && state.animation_type != 4 && tag == "InterruptCast") ||
-                  (state.animation_type != 4 && tag == "IdleStop") ||
-                  tag == "JumpUp" || tag == "MTstate"))
+        else if (IsAnimationEnd(state, tag, payload))
         {
             state.animation_type = 0;
             state.is_attacking = false;

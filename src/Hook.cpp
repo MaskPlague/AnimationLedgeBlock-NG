@@ -2,8 +2,8 @@ namespace Hook
 {
     bool Install()
     {
-        SKSE::AllocTrampoline(28);
-        logger::info("Installing hooks, allocated 28 bytes to the trampoline."sv);
+        SKSE::AllocTrampoline(14);
+        logger::info("Installing hook, allocated 14 bytes to the trampoline."sv);
 
         auto *playerUpdateManager = PlayerUpdateListener::GetSingleton();
         if (!playerUpdateManager)
@@ -46,20 +46,16 @@ namespace Hook
         internalCleanCounter = std::clamp(internalCleanCounter, 0.0f, timeBetweenCleaning);
     }
 
-    // Taken from https://github.com/VanCZ1/Block-Cancel-Fix/blob/main/src/Hooks.cpp
+    // target and offset from https://github.com/VanCZ1/Block-Cancel-Fix/blob/main/src/Hooks.cpp
     void MotionUpdateHook::InstallHook()
     {
         // 1.5.97: sub_1407020E0 call sub_1404E6360
         // 1.6.1170: sub_140797ED0 call sub_140540990
         // MovementTweenerAgentAnimationDriven::VTABLE[0], offset 0x11
         // call Character::ProcessMotionData
-        REL::Relocation<std::uintptr_t> target{RELOCATION_ID(41160, 42246)};
 
-        std::uintptr_t offset = 0x111;
-        if (REL::Module::IsAE())
-        {
-            offset = 0xFF;
-        }
+        REL::RelocationID target{41160, 42246};
+        size_t offset = REL::VariantOffset{0x111, 0xFF, 0x111}.offset();
 
         auto &trampoline = SKSE::GetTrampoline();
         _func = trampoline.write_call<5>(target.address() + offset, Thunk);
